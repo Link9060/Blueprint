@@ -66,7 +66,7 @@ $$;
 -- see names attached to pending membership requests for their own team.
 create or replace function private.shares_team(p_other_user uuid)
 returns boolean language sql stable security definer set search_path = ''
-as $
+as $$
  select (select auth.uid()) is not null and exists (
    select 1 from public.team_memberships viewer
    join public.team_memberships target on target.team_id = viewer.team_id
@@ -74,7 +74,7 @@ as $
      and target.user_id = p_other_user
      and (target.status = 'approved' or viewer.role = 'admin')
  );
-$;
+$$;
 revoke all on function private.shares_team(uuid) from public,anon;
 grant execute on function private.shares_team(uuid) to authenticated;
 
@@ -189,7 +189,7 @@ create policy "Leads create tasks" on public.tasks
 -- Assigned members can change only the status field; managers can edit details.
 create or replace function private.guard_task_change()
 returns trigger language plpgsql security invoker set search_path = ''
-as $
+as $$
 begin
  if NEW.assigned_to is not null and not exists (
   select 1 from public.team_memberships m
@@ -205,7 +205,7 @@ begin
  end if;
  return NEW;
 end;
-$;
+$$;
 revoke all on function private.guard_task_change() from public,anon;
 create trigger validate_task_changes
  before insert or update on public.tasks
