@@ -12,10 +12,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Syntax checks
+      - name: JavaScript syntax checks
         run: |
           node --check site/app.js
           node --check site/data.js
           node --check site/supabase.js
       - name: Run unit and schema tests
         run: node --test tests/data.test.mjs
+  database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: blueprint_ci_only
+          POSTGRES_DB: blueprint_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d blueprint_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: blueprint_ci_only
+      PGDATABASE: blueprint_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare simulated Supabase auth
+        run: psql -v ON_ERROR_STOP=1 -f tests/bootstrap.sql
+      - name: Apply Blueprint schema
+        run: psql -v ON_ERROR_STOP=1 -f database/schema.sql
+      - name: Verify team isolation and permissions
+        run: psql -v ON_ERROR_STOP=1 -f tests/security.sql
