@@ -1,7 +1,49 @@
 # Blueprint
 
-A focused workspace for FIRST Robotics teams 1810 and 9316.
+A quieter, more organized place to build robots.
 
-Blueprint is being built as a lightweight, accessible, mobile-friendly robotics coordination platform. First milestone: a GitHub Pages preview with clearly labeled sample data, plus a separate Supabase schema and secure membership design.
+Blueprint is a browser-based robotics team workspace for FRC teams **1810 (CATATRONICS)** and **9316 (CUBATRONICS)**. It is designed around real engineering work: tasks, subsystem progress, build logs, announcements, scheduling, and subgroup conversations.
 
-See `docs/SETUP.md` after the initial application commit for deployment and future backend instructions.
+## First-release features
+
+- Team selection and a responsive, accessible workspace
+- Overview dashboard, task list and editable completion state
+- Structured build logs and robot subsystem cards
+- Subgroup discussion channels and team directory
+- Calendar and workspace settings
+- Fast drafting-style line animations with reduced-motion support
+- Local demo data so teams can review the design safely
+- Optional Supabase adapter with Google OAuth, pending membership approval and RLS
+- GitHub Actions workflow to publish the static site to GitHub Pages
+
+**Important:** The public preview defaults to fictional data. It is **not** connected to your real team's information. Until a dedicated Supabase project is configured, Google sign-in and live collaboration are not active. Chat in preview is local to your browser.
+
+## Preview
+
+After enabling GitHub Pages with **GitHub Actions** as the source:
+
+https://link9060.github.io/Blueprint/
+
+Source: https://github.com/Link9060/Blueprint
+
+## Architecture
+
+- **Frontend:** dependency-free HTML, CSS and ES modules, hosted on GitHub Pages
+- **Presentation:** site/app.js and site/styles.css
+- **Demo store:** site/data.js, isolated per team in localStorage
+- **Production adapter:** site/supabase.js, SDK loaded only if configured
+- **Schema:** database/schema.sql with row-level security on every public table
+- **Automation:** .github/workflows/pages.yml
+
+This lean first release avoids build dependencies and gives the team a stable Pages deployment. The data and presentation layers are deliberately separated to allow future expansion.
+
+See **docs/SETUP.md** for publication, secure Supabase setup and the next milestones.
+
+## Roadmap
+
+1. Review UI with mentors and team leads.
+2. Set up a dedicated Supabase project and approve initial administrators.
+3. Add fully permissioned task assignment, announcements, live messaging and audit history.
+4. Add CAD links, inventory, manufacturing handoffs, competition mode and structured nightly summaries.
+
+Team member safety and access control are prerequisites before using Blueprint with real student data.
