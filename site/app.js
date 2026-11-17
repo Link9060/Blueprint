@@ -1,8 +1,8 @@
 import {teams,groups,channels,workspace,save,reset,progress} from "./data.js";
-import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,setLiveTaskStatus,addLiveLog,sendLiveMessage} from "./supabase.js";
+import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,sendLiveMessage,approveMembership} from "./supabase.js";
 
 const app=document.getElementById("app");
-const state={team:sessionStorage.getItem("blueprint-selected-team")||null,view:"overview",filter:"all",channel:"general",modal:null,menu:false,mode:configured()?"live":"demo",user:null,member:null,data:null,loading:false,error:""};
+const state={team:sessionStorage.getItem("blueprint-selected-team")||null,view:"overview",filter:"all",channel:"general",modal:null,menu:false,editingTaskId:null,taskScope:"all",mode:configured()?"live":"demo",user:null,member:null,data:null,loading:false,error:""};
 const glyphs={
  overview:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
  tasks:'<path d="M9 5h12M9 12h12M9 19h12"/><path d="m3 5 1.3 1.3L6.5 4M3 12l1.3 1.3L6.5 11M3 19l1.3 1.3L6.5 18"/>',
@@ -35,8 +35,10 @@ function notice(message){return '<div class="notice">'+icon("info",15)+'<span>'+
 function sampleNote(){return state.mode==="demo"?notice('<b>Preview workspace.</b> Names, tasks and activity shown here are fictional sample data. Changes are saved locally in this browser only.'):"";}
 function heading(eyebrow,title,description,extra=""){return '<header class="page-heading"><div><span class="eyebrow">'+e(eyebrow)+'</span><h1>'+e(title)+'</h1><p>'+e(description)+'</p></div><div class="actions">'+extra+'</div></header>';}
 function section(title,action="",content=""){return '<section class="card pad"><div class="section-heading"><h2>'+e(title)+'</h2>'+action+'</div>'+content+'</section>';}
+function canToggle(t){return state.mode==="demo"||canEdit()||(t.assigned_to&&t.assigned_to===state.user?.id);}
+function assignee(t){return state.data.people.find(p=>p.id===t.assigned_to)?.name||"Unassigned";}
 function taskLine(t){
- return '<div class="task"><button class="task-check '+(t.status==="done"?"done":"")+'" data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'"></button><div class="task-body"><b class="'+(t.status==="done"?"strike":"")+'">'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(t.due)+'</small></div>'+pill(t.status)+'</div>';
+ return '<div class="task"><button class="task-check '+(t.status==="done"?"done":"")+'" data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" '+(canToggle(t)?"":"disabled title=\"Only assignees and leads can update status\"")+'></button><div class="task-body"><b class="'+(t.status==="done"?"strike":"")+'">'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(assignee(t))+' · '+e(t.due)+'</small></div>'+pill(t.status)+'</div>';
 }
 function renderOverview(){
  const d=state.data;
@@ -49,9 +51,11 @@ function renderOverview(){
  return heading("TEAM WORKSPACE","A clearer way to build.","Your projects, people, and progress in one place.",'<span class="demo-label">'+(state.mode==="demo"?"DEMO WORKSPACE":"CONNECTED WORKSPACE")+'</span>')+sampleNote()+'<div class="stats">'+statHtml+'</div><div class="columns"><div class="column-stack">'+section("Your team's priorities",'<button data-view="tasks">View all tasks →</button>',upcoming)+section("Latest build activity",'<button data-view="logs">Open build log →</button>',updates)+'</div><div class="column-stack">'+section("Season progress","",'<div class="progress-head"><b>Task completion</b><span>'+p+'%</span></div><div class="track"><i style="width:'+p+'%"></i></div><p class="hint">'+done+' completed · '+open+' remaining. Keep the next handoff visible.</p>')+section("Coming up",'<button data-view="calendar">Full schedule →</button>',d.events.slice(0,3).map(x=>'<div class="feed"><div class="feed-icon">'+icon("calendar",15)+'</div><div class="feed-text"><b>'+e(x.title)+'</b><p>'+e(x.details)+'</p></div></div>').join("")||'<div class="empty">No upcoming events.</div>')+section("Blueprint brief","",'<div class="hint">The nightly review engine will summarize approved changes, current blockers and next steps once the live backend is configured. No AI summaries are being sent from this preview.</div>')+'</div></div>';
 }
 function renderTasks(){
- const tasks=state.data.tasks.filter(t=>state.filter==="all"||t.status===state.filter);
+ const tasks=state.data.tasks.filter(t=>(state.filter==="all"||t.status===state.filter)&&(state.taskScope==="all"||(state.mode==="demo"?t.assigned_to!=null:t.assigned_to===state.user?.id)));
  const allowed=canEdit();
- return heading("PROJECT COORDINATION","Tasks & assignments","Keep handoffs, deadlines and progress visible.",allowed?button(icon("plus",15)+" New task","new-task","primary"):"")+sampleNote()+'<div class="filter-row">'+[["all","All tasks"],["todo","To do"],["in_progress","In progress"],["blocked","Blocked"],["done","Complete"]].map(x=>'<button class="filter '+(state.filter===x[0]?"active":"")+'" data-filter="'+x[0]+'">'+x[1]+'</button>').join("")+'</div><div>'+tasks.map(t=>'<div class="card entry"><button data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" class="task-check '+(t.status==="done"?"done":"")+'"></button><div class="entry-main"><b>'+e(t.title)+'</b><small>'+e(t.subgroup)+' · Due '+e(t.due)+' · '+e(t.priority)+' priority</small></div>'+pill(t.status)+'</div>').join("")+'</div>'+(tasks.length?"":'<div class="empty">No tasks match this filter.</div>');
+ const statusFilters=[["all","All statuses"],["todo","To do"],["in_progress","In progress"],["blocked","Blocked"],["done","Complete"]];
+ const scope='<div class="scope-switch"><button data-task-scope="all" class="'+(state.taskScope==="all"?"active":"")+'">Team tasks</button><button data-task-scope="mine" class="'+(state.taskScope==="mine"?"active":"")+'">'+(state.mode==="demo"?"Assigned tasks":"My tasks")+'</button></div>';
+ return heading("PROJECT COORDINATION","Tasks & assignments","Clear ownership, useful deadlines, fewer missed handoffs.",allowed?button(icon("plus",15)+" New task","new-task","primary"):"")+sampleNote()+'<div class="task-toolbar">'+scope+'<div class="filter-row">'+statusFilters.map(x=>'<button class="filter '+(state.filter===x[0]?"active":"")+'" data-filter="'+x[0]+'">'+x[1]+'</button>').join("")+'</div></div><div>'+tasks.map(t=>'<div class="card entry"><button data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" class="task-check '+(t.status==="done"?"done":"")+'" '+(canToggle(t)?"":"disabled")+'></button><div class="entry-main"><b>'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(assignee(t))+' · Due '+e(t.due)+' · '+e(t.priority)+' priority</small></div>'+pill(t.status)+(allowed?'<div class="entry-actions"><button type="button" class="btn small" data-edit-task="'+e(t.id)+'">'+icon("pencil",13)+' Edit</button></div>':"")+'</div>').join("")+'</div>'+(tasks.length?"":'<div class="empty">No tasks match this view.</div>');
 }
 function renderLogs(){
  const entries=state.data.logs.map(l=>'<article class="log"><h3>'+e(l.title)+'</h3><p>'+e(l.body)+'</p><small>'+e(l.subgroup)+' · '+e(l.author)+' · '+e(l.time)+'</small></article>').join("");
@@ -69,6 +73,13 @@ function renderCalendar(){
  const cards=state.data.events.map(ev=>'<div class="card event"><div class="event-date"><b>'+e(ev.day)+'</b><small>'+e(ev.month)+'</small></div><div class="event-info"><b>'+e(ev.title)+'</b><small>'+e(ev.details)+'</small></div><span class="pill">'+e(ev.type)+'</span></div>').join("");
  return heading("LOOKING AHEAD","Schedule","Important meetings and milestones, in one place.")+sampleNote()+'<div class="events">'+(cards||'<div class="empty">There are no scheduled events yet.</div>')+'</div>';
 }
+function canAdmin(){return state.mode==="demo"||state.member?.role==="admin";}
+function renderAdmin(){
+ if(!canAdmin())return heading("PERMISSIONS","Access restricted","Only team administrators can review membership requests.");
+ const waiting=state.data.pending||[];
+ const list=waiting.map(m=>'<div class="approval-row" data-request-id="'+e(m.user_id)+'"><span class="avatar">'+e(initials(m.name))+'</span><div class="approval-info"><b>'+e(m.name)+'</b><small>'+e(m.subgroup)+' · Pending approval</small></div><label class="sr-only" for="role-'+e(m.user_id)+'">Role for '+e(m.name)+'</label><select class="field role-select" id="role-'+e(m.user_id)+'">'+["member","lead","captain","mentor","admin"].map(role=>'<option value="'+role+'">'+role[0].toUpperCase()+role.slice(1)+'</option>').join("")+'</select><div class="approval-actions"><button type="button" class="btn small" data-decision="rejected">Reject</button><button type="button" class="btn primary small" data-decision="approved">Approve</button></div></div>').join("");
+ return heading("TEAM OPERATIONS","Membership review","Approve verified members, and assign only the access they need.")+sampleNote()+notice('<b>Verify identities first.</b> Membership approval provides access to private team records. Confirm the applicant with a mentor or team lead outside this website.')+section("Pending requests",'<span class="pill">'+waiting.length+' pending</span>',list||'<div class="empty">No membership requests are waiting for review.</div>')+section("Access roles","",'<div class="hint">Members can read team work and send channel messages. Leads can manage tasks and build logs. Captains and mentors have the same project access. Only administrators can approve membership requests or assign roles.</div>');
+}
 function renderMessages(){
  const messages=(state.data.messages[state.channel]||[]).map(m=>'<div class="message"><div class="avatar">'+e(m.initials||initials(m.author))+'</div><div><b>'+e(m.author)+'</b><small>'+e(m.time)+'</small><p>'+e(m.text)+'</p></div></div>').join("");
  return heading("CONVERSATIONS","Team messages","Subgroup channels for clear, purposeful coordination.")+sampleNote()+'<div class="card chat"><aside class="channels"><h3>CHANNELS</h3>'+channels.map(c=>'<button class="channel '+(state.channel===c?"active":"")+'" data-channel="'+c+'"># '+e(c)+'</button>').join("")+'</aside><section class="conversation"><div class="chat-head"><b># '+e(state.channel)+'</b><small>Team '+e(state.team)+' · '+(state.mode==="demo"?"Local preview":"Team channel")+'</small></div><div class="messages">'+(messages||'<div class="empty">Start the conversation.</div>')+'</div><form class="compose" id="compose-form"><input class="field" name="body" maxlength="1000" placeholder="Message #'+e(state.channel)+'" aria-label="Message" required><button class="btn primary" type="submit">Send '+icon("arrow",14)+'</button></form></section></div>';
@@ -79,11 +90,11 @@ function renderSettings(){
 function canEdit(){return state.mode==="demo"||["lead","captain","mentor","admin"].includes(state.member?.role);}
 function sidebar(){
  const navigation=a("overview","Overview","overview")+a("tasks","Tasks","tasks")+a("logs","Build log","logs")+a("projects","Robot projects","projects")+a("messages","Messages","messages")+a("calendar","Calendar","calendar")+a("people","Members","people");
- return '<div class="screen '+(state.menu?"show":"")+'" data-action="close-menu"></div><aside class="side '+(state.menu?"open":"")+'"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><button class="team-picker" data-action="switch-team"><span class="team-box">'+e(state.team)+'</span><span><b>'+e(currentTeam().name)+'</b><small>Team workspace</small></span><span class="chev">'+icon("chevron",14)+'</span></button><div class="side-caption">WORKSPACE</div><nav class="nav" aria-label="Workspace">'+navigation+'</nav><div class="side-caption">GENERAL</div><nav class="nav" aria-label="General">'+a("settings","Settings","settings")+'</nav><div class="side-bottom"><span class="avatar">'+(state.mode==="demo"?"BP":e(initials(state.user?.user_metadata?.full_name||"Member")))+'</span><div><b>'+(state.mode==="demo"?"Preview user":e(state.user?.user_metadata?.full_name||"Team member"))+'</b><small>'+(state.mode==="demo"?"Demo workspace":e(state.member?.role||"Member"))+'</small></div><button class="push" data-action="sign-out" aria-label="Leave workspace">'+icon("logout",17)+'</button></div></aside>';
+ return '<div class="screen '+(state.menu?"show":"")+'" data-action="close-menu"></div><aside class="side '+(state.menu?"open":"")+'"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><button class="team-picker" data-action="switch-team"><span class="team-box">'+e(state.team)+'</span><span><b>'+e(currentTeam().name)+'</b><small>Team workspace</small></span><span class="chev">'+icon("chevron",14)+'</span></button><div class="side-caption">WORKSPACE</div><nav class="nav" aria-label="Workspace">'+navigation+'</nav><div class="side-caption">GENERAL</div><nav class="nav" aria-label="General">'+(canAdmin()?a("admin","Membership","people"):"")+a("settings","Settings","settings")+'</nav><div class="side-bottom"><span class="avatar">'+(state.mode==="demo"?"BP":e(initials(state.user?.user_metadata?.full_name||"Member")))+'</span><div><b>'+(state.mode==="demo"?"Preview user":e(state.user?.user_metadata?.full_name||"Team member"))+'</b><small>'+(state.mode==="demo"?"Demo workspace":e(state.member?.role||"Member"))+'</small></div><button class="push" data-action="sign-out" aria-label="Leave workspace">'+icon("logout",17)+'</button></div></aside>';
 }
 function shell(){
- const views={overview:renderOverview,tasks:renderTasks,logs:renderLogs,projects:renderProjects,messages:renderMessages,calendar:renderCalendar,people:renderPeople,settings:renderSettings};
- const labels={overview:"Overview",tasks:"Tasks",logs:"Build log",projects:"Robot projects",messages:"Messages",calendar:"Calendar",people:"Members",settings:"Settings"};
+ const views={overview:renderOverview,tasks:renderTasks,logs:renderLogs,projects:renderProjects,messages:renderMessages,calendar:renderCalendar,people:renderPeople,admin:renderAdmin,settings:renderSettings};
+ const labels={overview:"Overview",tasks:"Tasks",logs:"Build log",projects:"Robot projects",messages:"Messages",calendar:"Calendar",people:"Members",admin:"Membership",settings:"Settings"};
  return '<div class="shell">'+sidebar()+'<main class="main"><div class="bar"><div class="actions"><button class="round-button mobile-toggle" data-action="menu" aria-label="Open menu">'+icon("menu")+'</button><div class="crumb">Team '+e(state.team)+' <span>/</span> '+labels[state.view]+'</div></div><div class="bar-right"><span class="eyebrow" style="letter-spacing:.8px">'+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+'</span><button class="round-button" aria-label="Notifications" data-action="notifications">'+icon("bell")+'</button><span class="bar-avatar">'+(state.mode==="demo"?"BP":"TM")+'</span></div></div><div class="content enter">'+(views[state.view]||renderOverview)()+'</div></main></div>';
 }
 function landing(){
@@ -98,17 +109,31 @@ function authPage(){
 function waitingPage(){
  return '<div class="landing"><div class="landing-top"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div>'+button("Switch team","switch-team")+'</div><main class="landing-inner signin"><span class="eyebrow">ACCESS REQUEST</span><h1>Waiting for approval.</h1><p>Your membership request for Team '+e(state.team)+' has been received. A team administrator must approve access before you can view private information.</p>'+notice('Nothing from the team workspace is available until membership is approved.')+button("Check again","refresh-access","primary")+'</main></div>';
 }
+function selectionOptions(selected){
+ return '<option value="">Unassigned</option>'+state.data.people.map(p=>'<option value="'+e(p.id)+'" '+(p.id===selected?"selected":"")+'>'+e(p.name)+' · '+e(p.group)+'</option>').join("");
+}
 function modal(){
  if(!state.modal)return "";
- let title="",body="";
- if(state.modal==="task"){
- title="Create a task";body='<form id="task-form"><div class="form-group"><label>Task title</label><input class="field" name="title" maxlength="140" required placeholder="e.g. Verify intake clearance"></div><div class="form-group"><label>Subgroup</label><select class="field" name="subgroup">'+groups.map(x=>'<option>'+e(x)+'</option>').join("")+'</select></div><div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Create task</button></div></form>';
+ let title="",body="",description="";
+ if(state.modal==="task"||state.modal==="task-edit"){
+  const editing=state.modal==="task-edit";
+  const t=editing?state.data.tasks.find(item=>String(item.id)===String(state.editingTaskId)):null;
+  if(editing&&!t)return "";
+  title=editing?"Edit task":"Create a task";
+  description="Keep ownership, deadlines and progress current.";
+  const selected=t?.subgroup||"Design";
+  const selector=groups.map(g=>'<option '+(g===selected?"selected":"")+'>'+e(g)+'</option>').join("");
+  const priority=["Low","Normal","High"].map(p=>'<option '+(p===(t?.priority||"Normal")?"selected":"")+'>'+p+'</option>').join("");
+  const statusOptions=[["todo","To do"],["in_progress","In progress"],["blocked","Blocked"],["done","Complete"]].map(([value,name])=>'<option value="'+value+'" '+(value===(t?.status||"todo")?"selected":"")+'>'+name+'</option>').join("");
+  body='<form id="'+(editing?"task-edit-form":"task-form")+'"><div class="form-group"><label for="task-title">Task title</label><input id="task-title" class="field" name="title" maxlength="140" required value="'+e(t?.title||"")+'" placeholder="e.g. Verify intake clearance"></div><div class="form-duo"><div class="form-group"><label for="task-group">Subgroup</label><select id="task-group" class="field" name="subgroup">'+selector+'</select></div><div class="form-group"><label for="task-priority">Priority</label><select id="task-priority" class="field" name="priority">'+priority+'</select></div></div><div class="form-duo"><div class="form-group"><label for="task-owner">Assign to</label><select id="task-owner" class="field" name="assigned_to">'+selectionOptions(t?.assigned_to)+'</select></div><div class="form-group"><label for="task-due">Due date</label><input id="task-due" type="date" class="field" name="due_date" value="'+e(t?.due_date||"")+'"></div></div>'+(editing?'<div class="form-group"><label for="task-status">Status</label><select id="task-status" class="field" name="status">'+statusOptions+'</select></div>':"")+'<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">'+(editing?"Save changes":"Create task")+'</button></div></form>';
  }else if(state.modal==="log"){
- title="Add a build log entry";body='<form id="log-form"><div class="form-group"><label>What changed?</label><input class="field" name="title" maxlength="140" required placeholder="Short summary"></div><div class="form-group"><label>Details</label><textarea class="field" name="body" maxlength="3000" required placeholder="What was done, tested, or found?"></textarea></div><div class="form-group"><label>Subgroup</label><select class="field" name="subgroup">'+groups.map(x=>'<option>'+e(x)+'</option>').join("")+'</select></div><div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Add entry</button></div></form>';
+ title="Add a build log entry";description="Log a real change, test or engineering decision.";
+ body='<form id="log-form"><div class="form-group"><label>What changed?</label><input class="field" name="title" maxlength="140" required placeholder="Short summary"></div><div class="form-group"><label>Details</label><textarea class="field" name="body" maxlength="3000" required placeholder="What was done, tested, or found?"></textarea></div><div class="form-group"><label>Subgroup</label><select class="field" name="subgroup">'+groups.map(x=>'<option>'+e(x)+'</option>').join("")+'</select></div><div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Add entry</button></div></form>';
  }else{
- title="Notifications";body='<p>Automated alerts, email digests and nightly team reviews are planned for a later release. Blueprint will only send these once a team administrator configures and enables them.</p>'+button("Close","close-modal");
+ title="Notifications";description="Notification delivery is not connected yet.";
+ body='<p>Automated alerts, email digests and nightly team reviews are planned for a later release. Blueprint will send nothing until an administrator enables them.</p>'+button("Close","close-modal");
  }
- return '<div class="modal-cover" data-action="close-modal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><h2 id="modal-title">'+title+'</h2><p>'+((state.modal==="task"||state.modal==="log")?"Changes are saved only in this preview unless a live backend is connected.":"")+'</p>'+body+'</div></div>';
+ return '<div class="modal-cover" data-action="close-modal"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><h2 id="modal-title">'+title+'</h2><p>'+description+'</p>'+body+'</div></div>';
 }
 function render(){
  if(state.loading){app.innerHTML='<div class="landing"><div class="landing-top"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div></div><main class="landing-inner"><span class="eyebrow">LOADING WORKSPACE</span><h1>Setting things up.</h1></main></div>';return;}
@@ -135,7 +160,7 @@ async function refresh(){
 }
 async function chooseTeam(team){
  if(!teams.some(t=>t.id===team))return;
- state.team=team;sessionStorage.setItem("blueprint-selected-team",team);state.view="overview";state.channel="general";state.filter="all";state.member=null;state.menu=false;
+ state.team=team;sessionStorage.setItem("blueprint-selected-team",team);state.view="overview";state.channel="general";state.filter="all";state.taskScope="all";state.member=null;state.menu=false;
  await refresh();
 }
 async function dispatchAction(action){
@@ -145,8 +170,8 @@ async function dispatchAction(action){
  }
  if(action==="menu"){state.menu=!state.menu;render();return;}
  if(action==="close-menu"){state.menu=false;render();return;}
- if(action==="new-task"){state.modal="task";render();return;}
- if(action==="new-log"){state.modal="log";render();return;}
+ if(action==="new-task"){if(!canEdit())return;state.editingTaskId=null;state.modal="task";render();return;}
+ if(action==="new-log"){if(!canEdit())return;state.modal="log";render();return;}
  if(action==="notifications"){state.modal="notifications";render();return;}
  if(action==="close-modal"){state.modal=null;render();return;}
  if(action==="reset"){state.data=reset(state.team);render();toast("Sample data restored.");return;}
@@ -154,14 +179,37 @@ async function dispatchAction(action){
  if(action==="refresh-access"){await refresh();return;}
 }
 app.addEventListener("click",async ev=>{
- if(ev.target.closest(".modal")&&ev.target.closest(".modal-cover")?.dataset.action==="close-modal"&&!ev.target.closest("[data-action]"))return;
+ if(ev.target.closest(".modal")&&ev.target.closest("[data-action]")?.classList.contains("modal-cover"))return;
  const team=ev.target.closest("[data-team]");if(team){await chooseTeam(team.dataset.team);return;}
  const change=ev.target.closest("[data-view]");if(change){state.view=change.dataset.view;state.menu=false;state.filter="all";state.modal=null;render();return;}
  const filter=ev.target.closest("[data-filter]");if(filter){state.filter=filter.dataset.filter;render();return;}
+ const scope=ev.target.closest("[data-task-scope]");if(scope){state.taskScope=scope.dataset.taskScope;render();return;}
  const channel=ev.target.closest("[data-channel]");if(channel){state.channel=channel.dataset.channel;render();return;}
+ const edit=ev.target.closest("[data-edit-task]");if(edit&&canEdit()){state.editingTaskId=edit.dataset.editTask;state.modal="task-edit";render();return;}
+ const decision=ev.target.closest("[data-decision]");
+ if(decision){
+  if(!canAdmin())return;
+  const parent=decision.closest("[data-request-id]"),id=parent?.dataset.requestId;
+  const role=parent?.querySelector("select")?.value||"member";
+  const status=decision.dataset.decision;
+  if(!id||!["approved","rejected"].includes(status))return;
+  try{
+   if(state.mode==="demo"){
+    const person=state.data.pending.find(x=>x.user_id===id);
+    if(!person)return;
+    state.data.pending=state.data.pending.filter(x=>x.user_id!==id);
+    if(status==="approved")state.data.people.push({id,name:person.name,role,group:person.subgroup,initials:initials(person.name),status:"approved"});
+    save(state.team,state.data);render();
+   }else{
+    await approveMembership(state.team,id,status,role);await refresh();
+   }
+   toast(status==="approved"?"Membership approved.":"Request rejected.");
+  }catch(err){toast("Unable to update request: "+err.message);}
+  return;
+ }
  const toggle=ev.target.closest("[data-toggle]");
  if(toggle){
-  const task=state.data?.tasks.find(t=>String(t.id)===toggle.dataset.toggle);if(!task)return;
+  const task=state.data?.tasks.find(t=>String(t.id)===toggle.dataset.toggle);if(!task)return;if(!canToggle(task))return toast("Only an assigned member or lead can change this task.");
   const status=task.status==="done"?"todo":"done";
   if(state.mode==="demo"){task.status=status;save(state.team,state.data);render();}
   else{try{await setLiveTaskStatus(state.team,task.id,status);await refresh();}catch(err){toast("Update rejected: "+err.message);}}
@@ -171,7 +219,7 @@ app.addEventListener("click",async ev=>{
  if(button){await dispatchAction(button.dataset.action);}
 });
 app.addEventListener("submit",async ev=>{
- const form=ev.target;if(!["task-form","log-form","compose-form","request-form"].includes(form.id))return;
+ const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form"].includes(form.id))return;
  ev.preventDefault();const f=new FormData(form);
  try{
  if(form.id==="request-form"){
@@ -179,13 +227,27 @@ app.addEventListener("submit",async ev=>{
   if(!name||!groups.includes(subgroup))return toast("Enter a valid name and subgroup.");
   await requestMembership(state.team,state.user,name,subgroup);await refresh();toast("Access request submitted.");return;
  }
- if(form.id==="task-form"){
-  if(!canEdit())return toast("Only team leads can add tasks.");
+ if(form.id==="task-form"||form.id==="task-edit-form"){
+  if(!canEdit())return toast("Only team leads can manage tasks.");
+  const editing=form.id==="task-edit-form";
   const title=String(f.get("title")||"").trim().slice(0,140),subgroup=String(f.get("subgroup")||"");
-  if(!title||!groups.includes(subgroup))return;
-  if(state.mode==="demo"){state.data.tasks.unshift({id:"t"+Date.now(),title,subgroup,due:"Not scheduled",status:"todo",priority:"Normal"});save(state.team,state.data);}
-  else await addLiveTask(state.team,title,subgroup,state.user.id);
-  state.modal=null;state.view="tasks";
+  const priority=String(f.get("priority")||"Normal"),dueDate=String(f.get("due_date")||"");
+  const assignedTo=String(f.get("assigned_to")||"")||null;
+  const status=String(f.get("status")||"todo");
+  if(!title||!groups.includes(subgroup)||!["Low","Normal","High"].includes(priority)||!["todo","in_progress","blocked","done"].includes(status))return toast("Check the task fields.");
+  if(assignedTo&&!state.data.people.some(p=>p.id===assignedTo))return toast("Choose an approved team member.");
+  if(dueDate&&!/^\d{4}-\d{2}-\d{2}$/.test(dueDate))return toast("Enter a valid due date.");
+  const changes={title,subgroup,priority,assigned_to:assignedTo,due_date:dueDate||null,status};
+  if(state.mode==="demo"){
+   if(editing){const t=state.data.tasks.find(x=>String(x.id)===String(state.editingTaskId));if(!t)return;Object.assign(t,changes,{due:dueDate||"Not scheduled"});}
+   else state.data.tasks.unshift({id:"t"+Date.now(),...changes,due:dueDate||"Not scheduled"});
+   save(state.team,state.data);
+  }else{
+   if(editing)await editLiveTask(state.team,state.editingTaskId,changes);
+   else await addLiveTask(state.team,title,subgroup,state.user.id,assignedTo,dueDate,priority);
+  }
+  state.editingTaskId=null;state.modal=null;state.view="tasks";
+
  }else if(form.id==="log-form"){
   if(!canEdit())return toast("Only team leads can add log entries.");
   const title=String(f.get("title")||"").trim().slice(0,140),body=String(f.get("body")||"").trim().slice(0,3000),subgroup=String(f.get("subgroup")||"");

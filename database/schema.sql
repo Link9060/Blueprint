@@ -24,7 +24,7 @@ create table if not exists public.profiles (
 
 create table if not exists public.team_memberships (
   team_id text not null references public.teams(id) on delete cascade,
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
   role text not null default 'member' check (role in ('member','lead','captain','mentor','admin')),
   subgroup text not null check (subgroup in ('Design','Mechanical','Manufacturing','Electrical','Programming','Strategy','Business')),
   status text not null default 'pending' check (status in ('pending','approved','rejected')),
@@ -62,6 +62,22 @@ as $$
       and m.status='approved' and m.role='admin'
   );
 $$;
+-- Only approved teammates see each other's names. Team admins can also
+-- see names attached to pending membership requests for their own team.
+create or replace function private.shares_team(p_other_user uuid)
+returns boolean language sql stable security definer set search_path = ''
+as $
+ select (select auth.uid()) is not null and exists (
+   select 1 from public.team_memberships viewer
+   join public.team_memberships target on target.team_id = viewer.team_id
+   where viewer.user_id = (select auth.uid()) and viewer.status = 'approved'
+     and target.user_id = p_other_user
+     and (target.status = 'approved' or viewer.role = 'admin')
+ );
+$;
+revoke all on function private.shares_team(uuid) from public,anon;
+grant execute on function private.shares_team(uuid) to authenticated;
+
 revoke all on function private.is_approved_member(text) from public,anon;
 revoke all on function private.is_manager(text) from public,anon;
 revoke all on function private.is_admin(text) from public,anon;
@@ -138,7 +154,7 @@ revoke all on public.teams,public.profiles,public.team_memberships,public.tasks,
 grant select on public.teams to authenticated;
 grant select,insert,update(full_name) on public.profiles to authenticated;
 grant select,insert,update(role,subgroup,status) on public.team_memberships to authenticated;
-grant select,insert,update(status) on public.tasks to authenticated;
+grant select,insert,update(title,subgroup,due_date,priority,status,assigned_to) on public.tasks to authenticated;
 grant select,insert on public.build_logs to authenticated;
 grant select,insert on public.projects to authenticated;
 grant select,insert on public.messages to authenticated;
@@ -148,7 +164,7 @@ create policy "Signed-in users see team names" on public.teams
  for select to authenticated using (true);
 
 create policy "Read own profile" on public.profiles
- for select to authenticated using (id=(select auth.uid()));
+ for select to authenticated using (id=(select auth.uid()) or private.shares_team(id));
 create policy "Create own profile" on public.profiles
  for insert to authenticated with check (id=(select auth.uid()));
 create policy "Edit own profile" on public.profiles
@@ -157,7 +173,7 @@ create policy "Edit own profile" on public.profiles
 
 create policy "Read own or managed memberships" on public.team_memberships
  for select to authenticated
- using(user_id=(select auth.uid()) or private.is_manager(team_id));
+ using(user_id=(select auth.uid()) or (status='approved' and private.is_approved_member(team_id)) or private.is_admin(team_id));
 create policy "Request membership as member pending" on public.team_memberships
  for insert to authenticated
  with check(user_id=(select auth.uid()) and role='member' and status='pending');
@@ -169,6 +185,32 @@ create policy "Approved members read tasks" on public.tasks
  for select to authenticated using(private.is_approved_member(team_id));
 create policy "Leads create tasks" on public.tasks
  for insert to authenticated with check(private.is_manager(team_id) and created_by=(select auth.uid()));
+-- Validate assigned member and protect tasks from non-manager edits.
+-- Assigned members can change only the status field; managers can edit details.
+create or replace function private.guard_task_change()
+returns trigger language plpgsql security invoker set search_path = ''
+as $
+begin
+ if NEW.assigned_to is not null and not exists (
+  select 1 from public.team_memberships m
+  where m.team_id=NEW.team_id and m.user_id=NEW.assigned_to and m.status='approved'
+ ) then
+  raise exception 'Assignee must be an approved member of this team';
+ end if;
+ if TG_OP = 'UPDATE' and not private.is_manager(OLD.team_id) then
+  if OLD.assigned_to is distinct from (select auth.uid()) or
+     (to_jsonb(NEW) - 'status') is distinct from (to_jsonb(OLD) - 'status') then
+   raise exception 'Only task status can be changed by assigned members';
+  end if;
+ end if;
+ return NEW;
+end;
+$;
+revoke all on function private.guard_task_change() from public,anon;
+create trigger validate_task_changes
+ before insert or update on public.tasks
+ for each row execute function private.guard_task_change();
+
 create policy "Leads or assignees update task status" on public.tasks
  for update to authenticated
  using(private.is_manager(team_id) or (private.is_approved_member(team_id) and assigned_to=(select auth.uid())))
