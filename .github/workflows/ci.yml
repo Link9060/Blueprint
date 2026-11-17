@@ -1,0 +1,21 @@
+name: Blueprint CI
+on:
+  push:
+    branches:
+      - "build/**"
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax checks
+        run: |
+          node --check site/app.js
+          node --check site/data.js
+          node --check site/supabase.js
+      - name: Run unit and schema tests
+        run: node --test tests/data.test.mjs

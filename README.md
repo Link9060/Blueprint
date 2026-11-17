@@ -7,13 +7,13 @@ Blueprint is a browser-based robotics team workspace for FRC teams **1810 (CATAT
 ## First-release features
 
 - Team selection and a responsive, accessible workspace
-- Overview dashboard, task list and editable completion state
+- Overview dashboard, task ownership and due dates, role-aware editing, and a personal task view
 - Structured build logs and robot subsystem cards
 - Subgroup discussion channels and team directory
 - Calendar and workspace settings
 - Fast drafting-style line animations with reduced-motion support
 - Local demo data so teams can review the design safely
-- Optional Supabase adapter with Google OAuth, pending membership approval and RLS
+- Optional Supabase adapter with Google OAuth, administrator membership approval, team directory and RLS
 - GitHub Actions workflow to publish the static site to GitHub Pages
 
 **Important:** The public preview defaults to fictional data. It is **not** connected to your real team's information. Until a dedicated Supabase project is configured, Google sign-in and live collaboration are not active. Chat in preview is local to your browser.
@@ -43,7 +43,11 @@ See **docs/SETUP.md** for publication, secure Supabase setup and the next milest
 
 1. Review UI with mentors and team leads.
 2. Set up a dedicated Supabase project and approve initial administrators.
-3. Add fully permissioned task assignment, announcements, live messaging and audit history.
+3. Add real-time subscriptions, announcements, audit history and moderation controls.
 4. Add CAD links, inventory, manufacturing handoffs, competition mode and structured nightly summaries.
 
 Team member safety and access control are prerequisites before using Blueprint with real student data.
+
+## Quality gates
+
+`Blueprint CI` validates JavaScript syntax, deterministic demo isolation, and key schema security assumptions on development branches and pull requests. The `Publish Blueprint` workflow runs the same checks before deploying `main`. It cannot replace a real multi-account Supabase authorization test, which is required before onboarding students.

@@ -48,13 +48,13 @@ The initial admin must be promoted using a trusted SQL-editor action, not via an
 
 5. Sign in again or use **Check again** to refresh membership.
 
-An approved admin can authorize others in the database. The first release does **not** yet provide an admin review panel; approval must be performed through a trusted Supabase admin console. Do not promote students or mentors without the team's agreed governance.
+An approved admin can now open **Membership** in Blueprint's sidebar to review pending members, approve or reject requests, and assign access levels. The initial admin must still be bootstrapped manually. Verify every applicant's identity with an authorized school mentor before approving, especially anyone requesting elevated roles.
 
 ## 5. Features and boundaries
 
 **Available in demo:** team switch, dashboard, tasks and completion, build log entry creation, messages, subsystem cards, member directory, schedule and settings.
 
-**Available after Supabase setup:** Google sign-in, self-service membership request, pending/approved check, approved team-scoped data fetching, role-checked task creation and completion, lead-authored build entries, and team messaging. This first connector fetches messages on navigation/reload and does not yet subscribe to Realtime.
+**Available after Supabase setup:** Google sign-in, self-service membership request, pending/approved check, administrator approval panel, approved-team directory, role-checked task ownership and editing, lead-authored build entries, and channel messaging. This first connector fetches messages on navigation/reload and does not yet subscribe to Realtime.
 
 **Not implemented yet:** approval UI, file upload, notifications, email/SMS delivery, nightly AI reports, inventory, scouting integration, advanced task dependencies, moderation tools, task assignment UI, actual CAD file processing.
 
@@ -67,3 +67,11 @@ An approved admin can authorize others in the database. The first release does *
 - Add moderation, reporting and audit trails before broad rollout.
 - Keep any future AI output reviewable, grounded in verified records, and explicitly labeled.
 - Do not add a Supabase service-role key or OAuth client secret to GitHub Pages.
+
+## 7. Test before live student onboarding
+
+- Verify the GitHub Actions **Blueprint CI** result for every proposed change.
+- Using a separate non-production Supabase test project, sign in with at least an admin, a pending member, a normal approved member, and an approved member of the opposite team. Verify that cross-team reads and edits are denied.
+- Confirm that normal members cannot change task assignment, priority or role; only assigned members can change their own task status, and only admins can approve membership.
+- Check mobile usability, keyboard navigation and reduced-motion preferences before release.
+- Get mentor/school authorization and implement audit and abuse-reporting controls before connecting real student records.
