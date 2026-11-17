@@ -112,6 +112,12 @@ function waitingPage(){
 function selectionOptions(selected){
  return '<option value="">Unassigned</option>'+state.data.people.map(p=>'<option value="'+e(p.id)+'" '+(p.id===selected?"selected":"")+'>'+e(p.name)+' · '+e(p.group)+'</option>').join("");
 }
+function rejectedPage(){
+ return '<div class="landing"><div class="landing-top"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div>'+button("Switch team","switch-team")+'</div><main class="landing-inner signin"><span class="eyebrow">TEAM MEMBERSHIP</span><h1>Access not approved.</h1><p>Your request to join Team '+e(state.team)+' was not approved. To correct a mistaken request or ask a question, speak with an authorized team mentor. Team information remains private.</p>'+button("Check status again","refresh-access")+'</main></div>';
+}
+function connectionPage(){
+ return '<div class="landing"><div class="landing-top"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div>'+button("Switch team","switch-team")+'</div><main class="landing-inner signin"><span class="eyebrow">CONNECTION ISSUE</span><h1>Could not load your workspace.</h1><p>Blueprint could not fetch the latest information from the team database. Your membership is unchanged.</p>'+notice('<b>Details:</b> '+e(state.error||"Please try again."))+button("Retry connection","refresh-access","primary")+'</main></div>';
+}
 function modal(){
  if(!state.modal)return "";
  let title="",body="",description="";
@@ -139,8 +145,9 @@ function render(){
  if(state.loading){app.innerHTML='<div class="landing"><div class="landing-top"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div></div><main class="landing-inner"><span class="eyebrow">LOADING WORKSPACE</span><h1>Setting things up.</h1></main></div>';return;}
  if(!state.team){app.innerHTML=landing();return;}
  if(state.mode==="live"&&(!state.user||!state.member)){app.innerHTML=authPage();return;}
- if(state.mode==="live"&&state.member?.status!=="approved"){app.innerHTML=waitingPage();return;}
- if(!state.data){app.innerHTML=landing();return;}
+ if(state.mode==="live"&&state.member?.status==="pending"){app.innerHTML=waitingPage();return;}
+ if(state.mode==="live"&&state.member?.status==="rejected"){app.innerHTML=rejectedPage();return;}
+ if(!state.data){app.innerHTML=state.mode==="live"?connectionPage():landing();return;}
  app.innerHTML=shell()+modal();
 }
 function toast(text){
