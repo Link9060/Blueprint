@@ -20,10 +20,13 @@ The site is built as a proof-of-concept interface and foundation, not a producti
 
 ## 3. Set up a *separate* Supabase project
 
+**Account limit:** On November 16, 2026 Supabase refused creating `Blueprint` at the quoted $0/month cost because the account already had its maximum two active free projects. The existing `Relay` and `Link9060's Project` projects were left untouched. A free slot would require the owner's explicit decision to pause/delete an existing project, or moving to an eligible paid plan. Do not pause an app's database without confirming it is safe to interrupt.
+
+
 Do not use the existing **Relay** or other existing app's database. Blueprint should have its own project.
 
 1. Open https://supabase.com/dashboard and create a new project named **Blueprint**. Review any pricing/plan limit before creating it.
-2. In the new project's SQL editor, review and execute **database/schema.sql**. It creates teams, profiles, pending memberships, tasks, build logs, projects, messages and events. Every public table has RLS enabled and is permission-scoped.
+2. In the new project's SQL editor, review and execute **database/schema.sql**. This SQL is also run by GitHub Actions against a disposable PostgreSQL database with simulated auth roles and RLS tests. It creates teams, profiles, pending memberships, tasks, build logs, projects, messages and events. Every public table has RLS enabled and is permission-scoped.
 3. In **Authentication → Providers**, configure **Google** OAuth using the Google Cloud client ID and secret. Never put that secret into GitHub or frontend files.
 4. In **Authentication → URL Configuration**, set the Site URL and add redirect URL:
    https://link9060.github.io/Blueprint/
@@ -75,3 +78,12 @@ An approved admin can now open **Membership** in Blueprint's sidebar to review p
 - Confirm that normal members cannot change task assignment, priority or role; only assigned members can change their own task status, and only admins can approve membership.
 - Check mobile usability, keyboard navigation and reduced-motion preferences before release.
 - Get mentor/school authorization and implement audit and abuse-reporting controls before connecting real student records.
+
+## 8. Database validation in CI
+
+On each `build/**` branch push or pull request to `main`, **Blueprint CI** runs two jobs:
+
+- `test`: JavaScript syntax, mock data isolation and static schema expectations.
+- `database`: PostgreSQL 16 with a small simulated Supabase Auth environment. It runs `tests/bootstrap.sql`, applies `database/schema.sql`, and executes `tests/security.sql` to check access boundaries and safe task edits.
+
+The database CI tests passed on the readiness branch. **These do not prove real Supabase OAuth or every permission scenario.** Once the dedicated project is created, verify the actual policies with separate Google accounts, run Supabase Security Advisors, and obtain mentor approval before onboarding students.
