@@ -69,3 +69,45 @@
 @media(max-width:1100px){.overview-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:800px){.side{position:fixed;top:0;left:0}}
 @supports not (height:100dvh){.shell,.side,.main{height:100vh}}
+
+
+/* Engineering editing, personal profiles and avatar palette. */
+.record-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.record-title h3{margin:0 0 9px;min-width:0}
+.record-edit{white-space:nowrap;flex:none}
+.log .record-edit{margin:-6px 0 7px}
+.event{flex-wrap:wrap}
+.event .record-edit{margin-left:auto}
+.person{align-items:flex-start;min-width:0}
+.person-details{min-width:0;flex:1}
+.person-headline{margin:9px 0 0;font-size:11px;line-height:1.5;color:#506978}
+.person-bio{margin:7px 0 0;color:#87969e;font-size:11px;line-height:1.7;overflow-wrap:anywhere}
+.avatar-slate{background:#dfe6ea;color:#3d5562}
+.avatar-blue{background:#d8e9f3;color:#345f7e}
+.avatar-sage{background:#dcebe0;color:#386e55}
+.avatar-amber{background:#f5e7d2;color:#906437}
+.avatar-violet{background:#e7def3;color:#675087}
+.avatar-rose{background:#f4e0e4;color:#975768}
+.profile-hero{display:flex;align-items:center;gap:24px;padding:27px 30px;margin-bottom:20px}
+.avatar-large{height:82px;width:82px;border-radius:20px;font-size:29px;flex:none}
+.profile-hero h2{font-size:25px;letter-spacing:-1px;margin:9px 0 4px}
+.profile-hero p{font-size:12px;color:#81939d;line-height:1.7;margin:0 0 14px}
+.profile-form{max-width:850px}
+.profile-form .field{max-width:100%}
+.profile-form textarea{min-height:104px;resize:vertical}
+.profile-palette{border:0;padding:0;margin:12px 0 22px;min-width:0}
+.profile-palette legend{font-size:11px;font-weight:690;margin-bottom:13px}
+.profile-swatches{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.profile-swatch{display:flex;align-items:center;flex-direction:column;gap:7px;cursor:pointer;min-width:0;padding:12px 5px;border:1px solid #e4e9eb;border-radius:10px;background:#fbfcfc;transition:border-color .15s,background .15s}
+.profile-swatch:hover{border-color:#9fb5c0}
+.profile-swatch:has(input:checked){border-color:#5e859c;background:#f0f6f9}
+.profile-swatch input{position:absolute;opacity:0;width:1px;height:1px}
+.profile-swatch:focus-within{outline:2px solid #7195b0;outline-offset:3px}
+.profile-swatch-dot{height:37px;width:37px;border-radius:12px;display:block;border:1px solid #899aa122}
+.profile-swatch small{color:#778992;font-size:10px;font-weight:620;text-align:center}
+.field-help{display:block;font-size:10px;line-height:1.6;color:#8b99a0}
+.profile-form-footer{border-top:1px solid var(--line);padding-top:17px;display:flex;align-items:center;justify-content:space-between;gap:18px}
+.profile-form-footer .field-help{max-width:420px}
+.profile-form-footer .btn{flex:none}
+@media(max-width:800px){.profile-swatches{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:560px){.profile-hero{padding:21px;gap:15px}.avatar-large{width:62px;height:62px;font-size:22px;border-radius:16px}.profile-hero h2{font-size:20px}.profile-form-footer{flex-direction:column;align-items:stretch}.profile-form-footer .btn{width:100%}}
