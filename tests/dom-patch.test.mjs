@@ -142,6 +142,24 @@ test("multiple unsaved form fields remain mounted after unrelated live updates",
  assert.equal(root.firstChild.childNodes[1].firstChild.nodeValue,"5 team messages");
 });
 
+test("channel context changes update its message composer without rebuilding the site",()=>{
+ const input=el("input",{name:"body",placeholder:"Message #general"});
+ input.value="An old general-channel draft";
+ const original=el("form",{id:"compose-form","data-form-context":"general"},[input]);
+ const toolbar=el("nav",{},[txt("Teams")]);
+ const root=el("div",{},[toolbar,original]);
+ patchChildren(root,el("div",{},[
+  el("nav",{},[txt("Teams")]),
+  el("form",{id:"compose-form","data-form-context":"design"},[
+   el("input",{name:"body",placeholder:"Message #design"})
+  ])
+ ]));
+ assert.equal(root.firstChild,toolbar);
+ assert.equal(root.childNodes[1],original);
+ assert.equal(input.getAttribute("placeholder"),"Message #design");
+ assert.equal(original.getAttribute("data-form-context"),"design");
+});
+
 test("completion animation only follows a confirmed, visible completed state",()=>{
  const set=new Set(["done"]);
  const b={
