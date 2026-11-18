@@ -118,6 +118,54 @@ test("landing and sample workspace views render without browser dependencies", a
  assert.ok(html.includes("Please check fictional message"));
  assert.ok(html.includes('data-review-report='));
 
+ // Inventory, multi-project BOM and milestone forms use fictional sample data.
+ await handlers.click({target:fakeTarget("[data-view]","view","inventory")});
+ assert.ok(html.includes("Parts inventory"));
+ assert.ok(html.includes("Short 8"));
+ await handlers.click(action("new-stock"));
+ assert.ok(html.includes('id="stock-form"'));
+ await handlers.submit({target:{id:"stock-form",values:{
+  name:"Polycarbonate sheet",sku:"PLATE-REV2",quantity_on_hand:"3",
+  reorder_at:"2",unit:"sheet",storage_location:"Rack B",notes:"Prototype material"
+ }},preventDefault(){}});
+ assert.ok(html.includes("Polycarbonate sheet"));
+ await handlers.click({target:fakeTarget("[data-edit-stock]","editStock","demo-1810-stock-0")});
+ assert.ok(html.includes('id="stock-form"'));
+ await handlers.submit({target:{id:"stock-form",values:{
+  name:"M5 socket head bolts",sku:"FAST-M5-20",quantity_on_hand:"20",
+  reorder_at:"12",unit:"each",storage_location:"Fastener drawer A",notes:"Count verified"
+ }},preventDefault(){}});
+ assert.ok(html.includes("Count verified"));
+ assert.ok(!html.includes("Short 8"));
+ await handlers.click({target:fakeTarget("[data-view]","view","projects")});
+ assert.ok(html.includes("BILL OF MATERIALS"));
+ assert.ok(html.includes("MILESTONES"));
+ assert.ok(html.includes('data-add-bom="demo-1810-project-0"'));
+ await handlers.click({target:fakeTarget("[data-add-bom]","addBom","demo-1810-project-0")});
+ assert.ok(html.includes('id="bom-form"'));
+ await handlers.submit({target:{id:"bom-form",values:{
+  inventory_id:"demo-1810-stock-1",quantity_required:"150",notes:"Frame test requirement"
+ }},preventDefault(){}});
+ assert.ok(html.includes("Frame test requirement")===false || html.includes("6061 aluminum tube"));
+ await handlers.click({target:fakeTarget("[data-edit-bom]","editBom","demo-1810-bom-0")});
+ assert.ok(html.includes('id="bom-form"'));
+ await handlers.submit({target:{id:"bom-form",values:{
+  inventory_id:"demo-1810-stock-0",quantity_required:"24",notes:"Revised bolt count"
+ }},preventDefault(){}});
+ assert.ok(html.includes("Need 24 each"));
+ await handlers.click({target:fakeTarget("[data-add-milestone]","addMilestone","demo-1810-project-0")});
+ assert.ok(html.includes('id="milestone-form"'));
+ await handlers.submit({target:{id:"milestone-form",values:{
+  title:"Assembly ready",status:"planned",due_on:"2026-12-15",notes:"Verify fit"
+ }},preventDefault(){}});
+ assert.ok(html.includes("Assembly ready"));
+ await handlers.click({target:fakeTarget("[data-edit-milestone]","editMilestone","demo-1810-milestone-0")});
+ assert.ok(html.includes('id="milestone-form"'));
+ await handlers.submit({target:{id:"milestone-form",values:{
+  title:"Finalize drivetrain mounting",status:"done",due_on:"2026-12-04",notes:"Confirmed"
+ }},preventDefault(){}});
+ assert.ok(html.includes("1 of 3")||html.includes("33% done"));
+
  // The role inspector must hide admin tools in the Member view and never grant
  // or change server-side permissions.
  const selectRole=role=>({
@@ -129,6 +177,10 @@ test("landing and sample workspace views render without browser dependencies", a
  assert.ok(!html.includes('data-view="admin"'));
  await handlers.click({target:fakeTarget("[data-view]","view","logs")});
  assert.ok(!html.includes("data-edit-log="),"Member preview should not show log editing");
+ await handlers.click({target:fakeTarget("[data-view]","view","inventory")});
+ assert.ok(!html.includes("data-edit-stock="),"Member preview must not show stock controls");
+ await handlers.click(action("new-stock"));
+ assert.ok(!html.includes('id="stock-form"'),"Role inspector must block new inventory writes");
  await handlers.click(action("new-project"));
  assert.ok(!html.includes('id="project-form"'),"preview must remain read-only");
  await handlers.change({target:selectRole("admin")});

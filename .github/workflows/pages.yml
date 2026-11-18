@@ -26,8 +26,9 @@ jobs:
           node --check site/roles.js
           node --check site/profile.js
           node --check site/engineering.js
+          node --check site/planning.js
       - name: Test workspace data boundaries
-        run: node --test tests/data.test.mjs tests/render.test.mjs tests/roles.test.mjs tests/layout.test.mjs tests/profile.test.mjs tests/engineering.test.mjs
+        run: node --test tests/data.test.mjs tests/render.test.mjs tests/roles.test.mjs tests/layout.test.mjs tests/profile.test.mjs tests/engineering.test.mjs tests/planning.test.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
