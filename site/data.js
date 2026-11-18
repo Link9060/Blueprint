@@ -79,8 +79,9 @@ function make(team){
  const base=clone(library[team]||library["1810"]);
  const people=base.people.map((p,i)=>({...p,id:"demo-"+team+"-"+i,status:"approved"}));
  const tasks=base.tasks.map((t,i)=>({...t,assigned_to:i<3?people[i%people.length]?.id:null,priority:t.priority||"Normal",due_date:""}));
+ const projects=base.projects.map((p,i)=>({...p,id:"demo-"+team+"-project-"+i,subgroup:p.lead}));
  const pending=[{user_id:"demo-pending-"+team,name:"Jamie L.",subgroup:"Design",role:"member",status:"pending"}];
- return {team,name:base.name,tasks,projects:base.projects,logs:base.logs,people,pending,events:clone(commonEvents),messages:clone(initialMessages)};
+ return {team,name:base.name,tasks,projects,logs:base.logs,people,pending,events:clone(commonEvents),messages:clone(initialMessages)};
 }
 export const teams=[{id:"1810",name:"CATATRONICS"},{id:"9316",name:"CUBATRONICS"}];
 export const groups=["Design","Mechanical","Manufacturing","Electrical","Programming","Strategy","Business"];
@@ -94,6 +95,7 @@ export function workspace(team){
    if(!old||!Array.isArray(old.tasks)||!Array.isArray(old.logs))return fallback;
    const merged={...fallback,...old};
    merged.people=(merged.people||[]).map((p,i)=>({...p,id:p.id||"demo-"+team+"-"+i,status:p.status||"approved"}));
+   merged.projects=(merged.projects||[]).map((p,i)=>({...p,id:p.id||"demo-"+team+"-project-"+i,subgroup:p.subgroup||p.lead}));
    merged.pending=Array.isArray(merged.pending)?merged.pending:fallback.pending;
    return merged;
  }catch{return fallback;}
