@@ -166,6 +166,39 @@ test("landing and sample workspace views render without browser dependencies", a
  }},preventDefault(){}});
  assert.ok(html.includes("1 of 3")||html.includes("33% done"));
 
+ // New v7: prerequisite editing and event preparation in fictional preview.
+ await handlers.click({target:fakeTarget("[data-view]","view","tasks")});
+ assert.ok(html.includes('data-add-dependency="t2"'));
+ assert.ok(html.includes("Waiting for Review drivetrain CAD"));
+ await handlers.click({target:fakeTarget("[data-add-dependency]","addDependency","t2")});
+ assert.ok(html.includes('id="dependency-form"'));
+ assert.ok(html.includes('data-remove-dependency="t1"'));
+ await handlers.click({target:fakeTarget("[data-remove-dependency]","removeDependency","t1")});
+ assert.ok(!html.includes("Waiting for Review drivetrain CAD"));
+ await handlers.submit({target:{id:"dependency-form",values:{prerequisite_id:"t1"}},preventDefault(){}});
+ assert.ok(html.includes("Waiting for Review drivetrain CAD"));
+ await handlers.click({target:fakeTarget("[data-view]","view","calendar")});
+ assert.ok(html.includes("EVENT PREPARATION"));
+ assert.ok(html.includes('data-add-checklist="demo-1810-event-0"'));
+ assert.ok(html.includes("1 of 2 ready"));
+ await handlers.click({target:fakeTarget("[data-add-checklist]","addChecklist","demo-1810-event-0")});
+ assert.ok(html.includes('id="checklist-form"'));
+ await handlers.submit({target:{id:"checklist-form",values:{
+  title:"Confirm pit cart",category:"pit",assigned_to:"demo-1810-0",
+  notes:"Check wheels and locks"
+ }},preventDefault(){}});
+ assert.ok(html.includes("Confirm pit cart"));
+ assert.ok(html.includes("1 of 3 ready"));
+ await handlers.click({target:fakeTarget("[data-edit-checklist]","editChecklist","demo-1810-check-0")});
+ assert.ok(html.includes('id="checklist-form"'));
+ await handlers.submit({target:{id:"checklist-form",values:{
+  title:"Verify full tool kit",category:"packing",assigned_to:"demo-1810-0",
+  notes:"Sample",status:"todo"
+ }},preventDefault(){}});
+ assert.ok(html.includes("Verify full tool kit"));
+ await handlers.click({target:fakeTarget("[data-checklist-toggle]","checklistToggle","demo-1810-check-0")});
+ assert.ok(html.includes("2 of 3 ready"));
+
  // The role inspector must hide admin tools in the Member view and never grant
  // or change server-side permissions.
  const selectRole=role=>({
@@ -175,6 +208,10 @@ test("landing and sample workspace views render without browser dependencies", a
  await handlers.change({target:selectRole("member")});
  assert.ok(html.includes("Viewing as Member"));
  assert.ok(!html.includes('data-view="admin"'));
+ await handlers.click({target:fakeTarget("[data-view]","view","calendar")});
+ assert.ok(!html.includes("data-add-checklist="),"Member role preview should hide checklist editor");
+ await handlers.click({target:fakeTarget("[data-view]","view","tasks")});
+ assert.ok(!html.includes("data-add-dependency="),"Member role preview should hide prerequisite editor");
  await handlers.click({target:fakeTarget("[data-view]","view","logs")});
  assert.ok(!html.includes("data-edit-log="),"Member preview should not show log editing");
  await handlers.click({target:fakeTarget("[data-view]","view","inventory")});
