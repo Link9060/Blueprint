@@ -59,8 +59,8 @@ async function select(team,table,columns="*"){
  return unwrap(await sb.from(table).select(columns).eq("team_id",team).order("created_at",{ascending:false}).limit(table==="messages"?300:200));
 }
 export async function liveWorkspace(team){
- const [taskRows,logRows,projectRows,messageRows,eventRows,memberRows,announcementRows]=await Promise.all([
-  select(team,"tasks"),select(team,"build_logs"),select(team,"projects"),select(team,"messages"),select(team,"events"),select(team,"team_memberships","user_id,role,subgroup,status,created_at,profiles(full_name,headline,bio,avatar_color)"),select(team,"announcements")
+ const [taskRows,logRows,projectRows,messageRows,eventRows,memberRows,announcementRows,linkRows,partRows,reportRows,activityRows]=await Promise.all([
+  select(team,"tasks"),select(team,"build_logs"),select(team,"projects"),select(team,"messages"),select(team,"events"),select(team,"team_memberships","user_id,role,subgroup,status,created_at,profiles(full_name,headline,bio,avatar_color)"),select(team,"announcements"),select(team,"project_links"),select(team,"part_requests"),select(team,"message_reports"),select(team,"activity_events")
  ]);
  const people=memberRows.filter(x=>x.status==="approved").map(x=>({id:x.user_id,name:x.profiles?.full_name||"Team member",role:x.role,group:x.subgroup,headline:x.profiles?.headline||"",bio:x.profiles?.bio||"",avatar_color:x.profiles?.avatar_color||"slate",initials:(x.profiles?.full_name||"TM").split(" ").map(a=>a[0]).join("").slice(0,2).toUpperCase()}));
  const nameById=Object.fromEntries(people.map(p=>[p.id,p.name]));
@@ -68,9 +68,13 @@ export async function liveWorkspace(team){
  const logs=logRows.map(x=>({id:x.id,title:x.title,body:x.body||"",subgroup:x.subgroup||"General",author:nameById[x.author_id]||"Team member",time:new Date(x.created_at).toLocaleDateString(),edited_at:x.edited_at||null,edited_by:x.edited_by?nameById[x.edited_by]||"Team lead":null}));
  const projects=projectRows.map(x=>({id:x.id,name:x.name,icon:"◇",description:x.description||"",progress:x.progress||0,lead:x.subgroup||"General",subgroup:x.subgroup||"General"}));
  const events=eventRows.map(x=>{const d=new Date(x.starts_at);return {id:x.id,starts_at:x.starts_at,day:String(d.getDate()).padStart(2,"0"),month:d.toLocaleString("en-US",{month:"short"}).toUpperCase(),title:x.title,details:d.toLocaleString("en-US",{dateStyle:"medium",timeStyle:"short"}),type:"Team",edited_at:x.edited_at||null,edited_by:x.edited_by?nameById[x.edited_by]||"Team lead":null};}).sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));
- const messages={};for(const m of messageRows.slice().reverse()){(messages[m.channel]||=([])).push({id:m.id,author:nameById[m.author_id]||"Team member",initials:(nameById[m.author_id]||"TM").split(" ").map(a=>a[0]).join("").slice(0,2).toUpperCase(),time:new Date(m.created_at).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),text:m.body});}
+ const messages={};for(const m of messageRows.slice().reverse()){(messages[m.channel]||=([])).push({id:m.id,author:nameById[m.author_id]||"Team member",initials:(nameById[m.author_id]||"TM").split(" ").map(a=>a[0]).join("").slice(0,2).toUpperCase(),time:new Date(m.created_at).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),text:m.body,hidden:!!m.hidden_at,author_id:m.author_id});}
  const announcements=announcementRows.map(a=>({id:a.id,title:a.title,body:a.body,author:nameById[a.author_id]||"Team lead",time:new Date(a.created_at).toLocaleDateString()}));
- return {team,name:teams.find(x=>x.id===team)?.name||team,tasks,logs,projects,events,messages,announcements,people,pending:memberRows.filter(m=>m.status==="pending").map(m=>({user_id:m.user_id,name:m.profiles?.full_name||"Team member",subgroup:m.subgroup,role:m.role,status:m.status}))};
+ const projectLinks=linkRows.map(x=>({id:x.id,project_id:x.project_id,title:x.title,url:x.url,kind:x.kind,created_at:x.created_at}));
+ const partRequests=partRows.map(x=>({id:x.id,project_id:x.project_id,part_name:x.part_name,quantity:x.quantity,method:x.method,status:x.status,notes:x.notes,requested_by:x.requested_by,created_at:x.created_at,updated_at:x.updated_at}));
+ const reports=reportRows.map(x=>({id:x.id,message_id:x.message_id,reason:x.reason,note:x.note,status:x.status,reporter_id:x.reporter_id,created_at:x.created_at,reviewed_at:x.reviewed_at}));
+ const activity=activityRows.map(x=>({id:x.id,action:x.action,subject_type:x.subject_type,subject_id:x.subject_id,actor:nameById[x.actor_id]||"Team member",created_at:x.created_at}));
+ return {team,name:teams.find(x=>x.id===team)?.name||team,tasks,logs,projects,events,messages,announcements,people,projectLinks,partRequests,reports,activity,pending:memberRows.filter(m=>m.status==="pending").map(m=>({user_id:m.user_id,name:m.profiles?.full_name||"Team member",subgroup:m.subgroup,role:m.role,status:m.status}))};
 }
 export async function addLiveTask(team,title,subgroup,userId,assignedTo=null,dueDate=null,priority="Normal"){
  const sb=await client();
@@ -140,10 +144,56 @@ export async function addLiveAnnouncement(team,title,body,userId){
  const sb=await client();
  unwrap(await sb.from("announcements").insert({team_id:team,title,body,author_id:userId}));
 }
+
+export async function reportTeamMessage(team,messageId,reason,note,userId){
+ if(!["inappropriate","bullying","privacy","other"].includes(reason))throw new Error("Select a report reason.");
+ if(String(note||"").length>500)throw new Error("Report notes must be 500 characters or fewer.");
+ const sb=await client();
+ unwrap(await sb.from("message_reports").insert({
+  team_id:team,message_id:messageId,reporter_id:userId,reason,note:String(note||"").trim()
+ }));
+}
+export async function reviewTeamReport(team,id,status){
+ if(!["reviewed","dismissed"].includes(status))throw new Error("Invalid report status.");
+ const sb=await client();
+ const changed=unwrap(await sb.from("message_reports").update({status}).eq("team_id",team).eq("id",id).eq("status","open").select("id"));
+ if(!changed?.length)throw new Error("Could not review report. It may have been resolved already.");
+}
+export async function setMessageVisibility(team,id,visible){
+ const sb=await client();
+ const changed=unwrap(await sb.from("messages").update({hidden_at:visible?null:new Date().toISOString()}).eq("team_id",team).eq("id",id).select("id"));
+ if(!changed?.length)throw new Error("Could not change message visibility.");
+}
+export async function createEngineeringLink(team,projectId,title,url,kind,userId){
+ if(!["cad","drawing","document","code","other"].includes(kind))throw new Error("Invalid reference type.");
+ if(!/^https:\/\/[A-Za-z0-9.-]+(?::\d{1,5})?(?:\/\S*)?$/.test(url)||url.length>1000)throw new Error("Use a complete HTTPS link.");
+ const sb=await client();
+ unwrap(await sb.from("project_links").insert({team_id:team,project_id:projectId,title,url,kind,created_by:userId}));
+}
+export async function deleteEngineeringLink(team,id){
+ const sb=await client();
+ const changed=unwrap(await sb.from("project_links").delete().eq("team_id",team).eq("id",id).select("id"));
+ if(!changed?.length)throw new Error("Reference could not be removed.");
+}
+export async function requestPart(team,fields,userId){
+ if(!["3d_print","cnc","laser","assembly","other"].includes(fields.method))throw new Error("Unknown fabrication method.");
+ const sb=await client();
+ unwrap(await sb.from("part_requests").insert({
+  team_id:team,project_id:fields.project_id||null,part_name:fields.part_name,
+  quantity:fields.quantity,method:fields.method,notes:fields.notes||"",requested_by:userId
+ }));
+}
+export async function setPartStatus(team,id,status){
+ if(!["requested","approved","in_progress","on_hold","completed"].includes(status))throw new Error("Invalid progress status.");
+ const sb=await client();
+ const changed=unwrap(await sb.from("part_requests").update({status}).eq("team_id",team).eq("id",id).select("id"));
+ if(!changed?.length)throw new Error("Only a team Lead or above can update manufacturing progress.");
+}
+
 export async function subscribeTeam(team,onChange){
  const sb=await client();
  const channel=sb.channel("blueprint-team-"+team);
- for(const table of ["messages","tasks","build_logs","projects","events","announcements"]){
+ for(const table of ["messages","tasks","build_logs","projects","events","announcements","project_links","part_requests"]){
   channel.on("postgres_changes",{event:"*",schema:"public",table,filter:"team_id=eq."+team},onChange);
  }
  channel.subscribe();
