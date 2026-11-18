@@ -60,14 +60,14 @@ async function select(team,table,columns="*"){
 }
 export async function liveWorkspace(team){
  const [taskRows,logRows,projectRows,messageRows,eventRows,memberRows,announcementRows]=await Promise.all([
-  select(team,"tasks"),select(team,"build_logs"),select(team,"projects"),select(team,"messages"),select(team,"events"),select(team,"team_memberships","user_id,role,subgroup,status,created_at,profiles(full_name)"),select(team,"announcements")
+  select(team,"tasks"),select(team,"build_logs"),select(team,"projects"),select(team,"messages"),select(team,"events"),select(team,"team_memberships","user_id,role,subgroup,status,created_at,profiles(full_name,headline,bio,avatar_color)"),select(team,"announcements")
  ]);
- const people=memberRows.filter(x=>x.status==="approved").map(x=>({id:x.user_id,name:x.profiles?.full_name||"Team member",role:x.role,group:x.subgroup,initials:(x.profiles?.full_name||"TM").split(" ").map(a=>a[0]).join("").slice(0,2).toUpperCase()}));
+ const people=memberRows.filter(x=>x.status==="approved").map(x=>({id:x.user_id,name:x.profiles?.full_name||"Team member",role:x.role,group:x.subgroup,headline:x.profiles?.headline||"",bio:x.profiles?.bio||"",avatar_color:x.profiles?.avatar_color||"slate",initials:(x.profiles?.full_name||"TM").split(" ").map(a=>a[0]).join("").slice(0,2).toUpperCase()}));
  const nameById=Object.fromEntries(people.map(p=>[p.id,p.name]));
  const tasks=taskRows.map(x=>({id:x.id,title:x.title,subgroup:x.subgroup||"General",due:x.due_date||"Not scheduled",due_date:x.due_date||"",status:x.status,priority:x.priority||"Normal",assigned_to:x.assigned_to||null}));
- const logs=logRows.map(x=>({id:x.id,title:x.title,body:x.body||"",subgroup:x.subgroup||"General",author:nameById[x.author_id]||"Team member",time:new Date(x.created_at).toLocaleDateString()}));
+ const logs=logRows.map(x=>({id:x.id,title:x.title,body:x.body||"",subgroup:x.subgroup||"General",author:nameById[x.author_id]||"Team member",time:new Date(x.created_at).toLocaleDateString(),edited_at:x.edited_at||null,edited_by:x.edited_by?nameById[x.edited_by]||"Team lead":null}));
  const projects=projectRows.map(x=>({id:x.id,name:x.name,icon:"◇",description:x.description||"",progress:x.progress||0,lead:x.subgroup||"General",subgroup:x.subgroup||"General"}));
- const events=eventRows.map(x=>{const d=new Date(x.starts_at);return {id:x.id,starts_at:x.starts_at,day:String(d.getDate()).padStart(2,"0"),month:d.toLocaleString("en-US",{month:"short"}).toUpperCase(),title:x.title,details:d.toLocaleString("en-US",{dateStyle:"medium",timeStyle:"short"}),type:"Team"};}).sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));
+ const events=eventRows.map(x=>{const d=new Date(x.starts_at);return {id:x.id,starts_at:x.starts_at,day:String(d.getDate()).padStart(2,"0"),month:d.toLocaleString("en-US",{month:"short"}).toUpperCase(),title:x.title,details:d.toLocaleString("en-US",{dateStyle:"medium",timeStyle:"short"}),type:"Team",edited_at:x.edited_at||null,edited_by:x.edited_by?nameById[x.edited_by]||"Team lead":null};}).sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));
  const messages={};for(const m of messageRows.slice().reverse()){(messages[m.channel]||=([])).push({id:m.id,author:nameById[m.author_id]||"Team member",initials:(nameById[m.author_id]||"TM").split(" ").map(a=>a[0]).join("").slice(0,2).toUpperCase(),time:new Date(m.created_at).toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),text:m.body});}
  const announcements=announcementRows.map(a=>({id:a.id,title:a.title,body:a.body,author:nameById[a.author_id]||"Team lead",time:new Date(a.created_at).toLocaleDateString()}));
  return {team,name:teams.find(x=>x.id===team)?.name||team,tasks,logs,projects,events,messages,announcements,people,pending:memberRows.filter(m=>m.status==="pending").map(m=>({user_id:m.user_id,name:m.profiles?.full_name||"Team member",subgroup:m.subgroup,role:m.role,status:m.status}))};
@@ -87,6 +87,13 @@ export async function setLiveTaskStatus(team,id,status){
  const sb=await client();const rows=unwrap(await sb.from("tasks").update({status}).eq("team_id",team).eq("id",id).select("id"));
  if(!rows?.length)throw new Error("Task not changed; verify assignment.");
 }
+export async function editLiveLog(team,id,fields){
+ const sb=await client();
+ const rows=unwrap(await sb.from("build_logs").update({
+  title:fields.title,body:fields.body,subgroup:fields.subgroup
+ }).eq("team_id",team).eq("id",id).select("id"));
+ if(!rows?.length)throw new Error("Build log not updated; check your Lead access.");
+}
 export async function addLiveLog(team,title,body,subgroup,userId){
  const sb=await client();unwrap(await sb.from("build_logs").insert({team_id:team,title,body,subgroup,author_id:userId}));
 }
@@ -105,6 +112,29 @@ export async function editLiveProject(team,id,fields){
 export async function addLiveEvent(team,title,startTime,userId){
  const sb=await client();
  unwrap(await sb.from("events").insert({team_id:team,title,starts_at:startTime,created_by:userId}));
+}
+export async function editLiveEvent(team,id,title,startTime){
+ const sb=await client();
+ const rows=unwrap(await sb.from("events").update({title,starts_at:startTime})
+  .eq("team_id",team).eq("id",id).select("id"));
+ if(!rows?.length)throw new Error("Event not updated; check your Lead access.");
+}
+export async function getLiveProfile(userId){
+ const sb=await client();
+ return unwrap(await sb.from("profiles").select("full_name,headline,bio,avatar_color").eq("id",userId).maybeSingle());
+}
+export async function saveLiveProfile(userId,fields){
+ const sb=await client();
+ const rows=unwrap(await sb.from("profiles").update({
+  full_name:fields.full_name,headline:fields.headline,bio:fields.bio,avatar_color:fields.avatar_color
+ }).eq("id",userId).select("id"));
+ if(!rows?.length)throw new Error("Profile update was not permitted.");
+}
+export async function updateOwnSubgroup(team,userId,subgroup){
+ const sb=await client();
+ const rows=unwrap(await sb.from("team_memberships").update({subgroup})
+  .eq("team_id",team).eq("user_id",userId).eq("status","approved").select("user_id"));
+ if(!rows?.length)throw new Error("Subgroup update was not permitted.");
 }
 export async function addLiveAnnouncement(team,title,body,userId){
  const sb=await client();
