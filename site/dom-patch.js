@@ -32,6 +32,9 @@ function patchNode(oldNode,newNode){
  }
  const active=typeof document!=="undefined"&&document.activeElement===oldNode;
  updateAttrs(oldNode,newNode);
+ // Keep the entire existing form draft during background updates, including
+ // fields that are filled but not currently focused. A new modal ID replaces it.
+ if(oldNode.tagName==="FORM"&&oldNode.id&&oldNode.id===newNode.id)return;
  if(oldNode.tagName==="INPUT"){
   if(!active&&oldNode.value!==newNode.value)oldNode.value=newNode.value;
   if(oldNode.checked!==newNode.checked)oldNode.checked=newNode.checked;

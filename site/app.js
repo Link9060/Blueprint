@@ -69,7 +69,7 @@ function blockerLabel(t){
  return blockers.length?'<small class="dependency-warning">'+icon("info",12)+' Waiting for '+e(blockers.map(x=>x.title).join(", "))+'</small>':"";
 }
 function taskLine(t){
- return '<div class="task" data-dom-key="overview-task-'+e(t.id)+'"><button class="task-check '+(t.status==="done"?"done":"")+'" data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" '+(canToggle(t)?"":"disabled title=\"Only assignees and leads can update status\"")+'></button><div class="task-body"><b class="'+(t.status==="done"?"strike":"")+'">'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(assignee(t))+' · '+e(t.due)+'</small>'+blockerLabel(t)+'</div>'+pill(t.status)+'</div>';
+ return '<div class="task" data-dom-key="overview-task-'+e(t.id)+'"><button class="task-check '+(t.status==="done"?"done":"")+'" data-toggle="'+e(t.id)+'" aria-pressed="'+(t.status==="done"?"true":"false")+'" aria-label="Toggle '+e(t.title)+'" '+(canToggle(t)?"":"disabled title=\"Only assignees and leads can update status\"")+'></button><div class="task-body"><b class="'+(t.status==="done"?"strike":"")+'">'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(assignee(t))+' · '+e(t.due)+'</small>'+blockerLabel(t)+'</div>'+pill(t.status)+'</div>';
 }
 function renderOverview(){
  const d=state.data;
@@ -241,7 +241,7 @@ function renderCalendar(){
   const summary=preparationProgress(items);
   const checklist=items.map(item=>{
    const assigned=state.data.people.find(p=>p.id===item.assigned_to)?.name||"Unassigned";
-   return '<div class="event-checklist-item" data-dom-key="checklist-'+e(item.id)+'"><button type="button" data-checklist-toggle="'+e(item.id)+'" aria-label="Toggle '+e(item.title)+'" class="task-check '+(item.status==="done"?"done":"")+'" '+(canToggleChecklist(item)?"":'disabled title="Assigned teammate or Lead only"')+'></button>'+
+   return '<div class="event-checklist-item" data-dom-key="checklist-'+e(item.id)+'"><button type="button" data-checklist-toggle="'+e(item.id)+'" aria-pressed="'+(item.status==="done"?"true":"false")+'" aria-label="Toggle '+e(item.title)+'" class="task-check '+(item.status==="done"?"done":"")+'" '+(canToggleChecklist(item)?"":'disabled title="Assigned teammate or Lead only"')+'></button>'+
     '<div><b class="'+(item.status==="done"?"strike":"")+'">'+e(item.title)+'</b><small>'+e(preparationLabels[item.category]||"Other")+' · '+e(assigned)+'</small></div>'+
     (canEdit()?'<button type="button" class="subtle-action" data-edit-checklist="'+e(item.id)+'">Edit</button>':"")+'</div>';
   }).join("");
@@ -613,7 +613,7 @@ function render(){
 }
 function toast(text){
  document.querySelector(".toast")?.remove();
- const el=document.createElement("div");el.className="toast";el.textContent=text;document.body.append(el);setTimeout(()=>el.remove(),3300);
+ const el=document.createElement("div");el.className="toast";el.setAttribute?.("role","status");el.setAttribute?.("aria-live","polite");el.textContent=text;document.body.append(el);setTimeout(()=>el.remove(),3300);
 }
 function stopLiveUpdates(){
  clearTimeout(state.realtimeTimer);
