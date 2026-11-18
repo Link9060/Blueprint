@@ -59,8 +59,8 @@ async function select(team,table,columns="*"){
  return unwrap(await sb.from(table).select(columns).eq("team_id",team).order("created_at",{ascending:false}).limit(table==="messages"?300:200));
 }
 export async function liveWorkspace(team){
- const [taskRows,logRows,projectRows,messageRows,eventRows,memberRows,announcementRows,linkRows,partRows,reportRows,activityRows]=await Promise.all([
-  select(team,"tasks"),select(team,"build_logs"),select(team,"projects"),select(team,"messages"),select(team,"events"),select(team,"team_memberships","user_id,role,subgroup,status,created_at,profiles(full_name,headline,bio,avatar_color)"),select(team,"announcements"),select(team,"project_links"),select(team,"part_requests"),select(team,"message_reports"),select(team,"activity_events")
+ const [taskRows,logRows,projectRows,messageRows,eventRows,memberRows,announcementRows,linkRows,partRows,reportRows,activityRows,stockRows,bomRows,milestoneRows]=await Promise.all([
+  select(team,"tasks"),select(team,"build_logs"),select(team,"projects"),select(team,"messages"),select(team,"events"),select(team,"team_memberships","user_id,role,subgroup,status,created_at,profiles(full_name,headline,bio,avatar_color)"),select(team,"announcements"),select(team,"project_links"),select(team,"part_requests"),select(team,"message_reports"),select(team,"activity_events"),select(team,"inventory_items"),select(team,"project_bom_items"),select(team,"project_milestones")
  ]);
  const people=memberRows.filter(x=>x.status==="approved").map(x=>({id:x.user_id,name:x.profiles?.full_name||"Team member",role:x.role,group:x.subgroup,headline:x.profiles?.headline||"",bio:x.profiles?.bio||"",avatar_color:x.profiles?.avatar_color||"slate",initials:(x.profiles?.full_name||"TM").split(" ").map(a=>a[0]).join("").slice(0,2).toUpperCase()}));
  const nameById=Object.fromEntries(people.map(p=>[p.id,p.name]));
@@ -74,7 +74,7 @@ export async function liveWorkspace(team){
  const partRequests=partRows.map(x=>({id:x.id,project_id:x.project_id,part_name:x.part_name,quantity:x.quantity,method:x.method,status:x.status,notes:x.notes,requested_by:x.requested_by,created_at:x.created_at,updated_at:x.updated_at}));
  const reports=reportRows.map(x=>({id:x.id,message_id:x.message_id,reason:x.reason,note:x.note,status:x.status,reporter_id:x.reporter_id,created_at:x.created_at,reviewed_at:x.reviewed_at}));
  const activity=activityRows.map(x=>({id:x.id,action:x.action,subject_type:x.subject_type,subject_id:x.subject_id,actor:nameById[x.actor_id]||"Team member",created_at:x.created_at}));
- return {team,name:teams.find(x=>x.id===team)?.name||team,tasks,logs,projects,events,messages,announcements,people,projectLinks,partRequests,reports,activity,pending:memberRows.filter(m=>m.status==="pending").map(m=>({user_id:m.user_id,name:m.profiles?.full_name||"Team member",subgroup:m.subgroup,role:m.role,status:m.status}))};
+ return {team,name:teams.find(x=>x.id===team)?.name||team,tasks,logs,projects,events,messages,announcements,people,projectLinks,partRequests,reports,activity,inventory:stockRows,bom:bomRows,milestones:milestoneRows,pending:memberRows.filter(m=>m.status==="pending").map(m=>({user_id:m.user_id,name:m.profiles?.full_name||"Team member",subgroup:m.subgroup,role:m.role,status:m.status}))};
 }
 export async function addLiveTask(team,title,subgroup,userId,assignedTo=null,dueDate=null,priority="Normal"){
  const sb=await client();
@@ -190,10 +190,58 @@ export async function setPartStatus(team,id,status){
  if(!changed?.length)throw new Error("Only a team Lead or above can update manufacturing progress.");
 }
 
+
+export async function createInventoryItem(team,fields,userId){
+ const sb=await client();
+ const rows=unwrap(await sb.from("inventory_items").insert({...fields,team_id:team,created_by:userId}).select("id"));
+ if(!rows?.length)throw new Error("Stock item was not created.");
+}
+export async function updateInventoryItem(team,id,fields){
+ const sb=await client();
+ const rows=unwrap(await sb.from("inventory_items").update(fields).eq("team_id",team).eq("id",id).select("id"));
+ if(!rows?.length)throw new Error("Inventory update denied or item missing.");
+}
+export async function createBomLine(team,projectId,inventoryId,required,notes,userId){
+ const sb=await client();
+ const rows=unwrap(await sb.from("project_bom_items").insert({
+  team_id:team,project_id:projectId,inventory_id:inventoryId,
+  quantity_required:required,notes,created_by:userId
+ }).select("id"));
+ if(!rows?.length)throw new Error("BOM item was not linked.");
+}
+export async function updateBomLine(team,id,required,notes){
+ const sb=await client();
+ const rows=unwrap(await sb.from("project_bom_items").update({
+  quantity_required:required,notes
+ }).eq("team_id",team).eq("id",id).select("id"));
+ if(!rows?.length)throw new Error("BOM update denied or missing.");
+}
+export async function removeBomLine(team,id){
+ const sb=await client();
+ const rows=unwrap(await sb.from("project_bom_items").delete().eq("team_id",team).eq("id",id).select("id"));
+ if(!rows?.length)throw new Error("BOM line could not be removed.");
+}
+export async function createProjectMilestone(team,fields,userId){
+ const sb=await client();
+ const rows=unwrap(await sb.from("project_milestones").insert({
+  team_id:team,...fields,created_by:userId
+ }).select("id"));
+ if(!rows?.length)throw new Error("Milestone was not created.");
+}
+export async function updateProjectMilestone(team,id,fields){
+ const sb=await client();
+ const rows=unwrap(await sb.from("project_milestones").update(fields).eq("team_id",team).eq("id",id).select("id"));
+ if(!rows?.length)throw new Error("Milestone update denied or missing.");
+}
+export async function removeProjectMilestone(team,id){
+ const sb=await client();
+ const rows=unwrap(await sb.from("project_milestones").delete().eq("team_id",team).eq("id",id).select("id"));
+ if(!rows?.length)throw new Error("Milestone could not be removed.");
+}
 export async function subscribeTeam(team,onChange){
  const sb=await client();
  const channel=sb.channel("blueprint-team-"+team);
- for(const table of ["messages","tasks","build_logs","projects","events","announcements","project_links","part_requests"]){
+ for(const table of ["messages","tasks","build_logs","projects","events","announcements","project_links","part_requests","inventory_items","project_bom_items","project_milestones"]){
   channel.on("postgres_changes",{event:"*",schema:"public",table,filter:"team_id=eq."+team},onChange);
  }
  channel.subscribe();
