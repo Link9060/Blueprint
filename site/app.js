@@ -103,7 +103,7 @@ function sidebar(){
 function shell(){
  const views={overview:renderOverview,announcements:renderAnnouncements,tasks:renderTasks,logs:renderLogs,projects:renderProjects,messages:renderMessages,calendar:renderCalendar,people:renderPeople,admin:renderAdmin,settings:renderSettings};
  const labels={overview:"Overview",announcements:"Announcements",tasks:"Tasks",logs:"Build log",projects:"Robot projects",messages:"Messages",calendar:"Calendar",people:"Members",admin:"Membership",settings:"Settings"};
- return '<div class="shell">'+sidebar()+'<main class="main"><div class="bar"><div class="actions"><button class="round-button mobile-toggle" data-action="menu" aria-label="Open menu">'+icon("menu")+'</button><div class="crumb">Team '+e(state.team)+' <span>/</span> '+labels[state.view]+'</div></div><div class="bar-right"><span class="eyebrow" style="letter-spacing:.8px">'+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+'</span><button class="round-button" aria-label="Notifications" data-action="notifications">'+icon("bell")+'</button><span class="bar-avatar">'+(state.mode==="demo"?"BP":"TM")+'</span></div></div><div class="content enter">'+(views[state.view]||renderOverview)()+'</div></main></div>';
+ return '<div class="shell">'+sidebar()+'<main class="main"><div class="bar"><div class="actions"><button class="round-button mobile-toggle" data-action="menu" aria-label="Open menu">'+icon("menu")+'</button><div class="crumb">Team '+e(state.team)+' <span>/</span> '+labels[state.view]+'</div></div><div class="bar-right"><span class="eyebrow" style="letter-spacing:.8px">'+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+'</span><button class="round-button" aria-label="Refresh workspace" data-action="refresh-live" title="Refresh workspace">↻</button><button class="round-button" aria-label="Notifications" data-action="notifications">'+icon("bell")+'</button><span class="bar-avatar">'+(state.mode==="demo"?"BP":"TM")+'</span></div></div><div class="content enter">'+(views[state.view]||renderOverview)()+'</div></main></div>';
 }
 function landing(){
  return '<div class="landing"><div class="landing-top"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><small>ROBOTICS TEAM MANAGEMENT</small></div><main class="landing-inner enter"><span class="eyebrow">THE WORK BEHIND THE ROBOT</span><h1>A better place<br>to <em>build together.</em></h1><p class="landing-intro">Tasks, conversations, engineering logs and team progress. Organized around the people actually building the robot.</p><div class="team-choices">'+teams.map(t=>'<button class="team-choice" data-team="'+t.id+'"><strong>'+t.id+'</strong><span>'+e(t.name)+'</span><small>'+(state.mode==="demo"?"OPEN PREVIEW":"CONTINUE TO SIGN IN")+' &nbsp; →</small></button>').join("")+'</div><div style="margin-top:18px"><span class="demo-label">'+(state.mode==="demo"?"PREVIEW MODE · SAMPLE DATA":"SECURE GOOGLE SIGN-IN")+'</span></div></main><footer class="landing-foot"><span>Blueprint · Made for the build season</span><span>Teams 1810 & 9316</span></footer></div>';
@@ -177,37 +177,86 @@ function toast(text){
  document.querySelector(".toast")?.remove();
  const el=document.createElement("div");el.className="toast";el.textContent=text;document.body.append(el);setTimeout(()=>el.remove(),3300);
 }
-async function refresh(){
- if(state.mode==="demo"){state.data=workspace(state.team);render();return;}
- state.loading=true;render();
- try{
-  state.user=await getUser();
-  state.member=state.user?await membership(state.team,state.user.id):null;
-  state.data=state.member?.status==="approved"?await liveWorkspace(state.team):null;
-  state.error="";
- }catch(err){state.error=err.message||"Connection failed.";toast(state.error);}
- finally{state.loading=false;render();}
+function stopLiveUpdates(){
+ clearTimeout(state.realtimeTimer);
+ state.realtimeTimer=null;
+ if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}
+ state.subscriptionTeam=null;
 }
+async function refresh(quiet=false){
+ if(!state.team)return;
+ if(state.mode==="demo"){state.data=workspace(state.team);render();return;}
+ if(state.refreshBusy)return;
+ state.refreshBusy=true;
+ const previousDraft=quiet?document.querySelector("#compose-form input")?.value:null;
+ const requestedTeam=state.team;
+ if(!quiet){state.loading=true;render();}
+ try{
+  const user=await getUser();
+  if(state.team!==requestedTeam)return;
+  state.user=user;
+  state.member=user?await membership(requestedTeam,user.id):null;
+  state.data=state.member?.status==="approved"?await liveWorkspace(requestedTeam):null;
+  state.error="";
+  if(state.member?.status==="approved"){
+   if(state.subscriptionTeam!==requestedTeam){
+    stopLiveUpdates();
+    state.subscriptionTeam=requestedTeam;
+    state.unsubscribe=await subscribeTeam(requestedTeam,()=>{
+     if(state.team!==requestedTeam||state.mode!=="live")return;
+     clearTimeout(state.realtimeTimer);
+     state.realtimeTimer=setTimeout(()=>{void refresh(true);},850);
+    });
+   }
+  }else stopLiveUpdates();
+ }catch(err){
+  state.error=err.message||"Connection failed.";
+  state.data=null;stopLiveUpdates();
+  if(!quiet)toast(state.error);
+ }finally{
+  state.loading=false;state.refreshBusy=false;
+  render();
+  if(quiet&&previousDraft!=null){
+   const input=document.querySelector("#compose-form input");
+   if(input)input.value=previousDraft;
+  }
+ }
+}
+
 async function chooseTeam(team){
  if(!teams.some(t=>t.id===team))return;
- state.team=team;sessionStorage.setItem("blueprint-selected-team",team);state.view="overview";state.channel="general";state.filter="all";state.taskScope="all";state.member=null;state.menu=false;
+ stopLiveUpdates();state.team=team;sessionStorage.setItem("blueprint-selected-team",team);state.view="overview";state.channel="general";state.filter="all";state.taskScope="all";state.member=null;state.menu=false;
  await refresh();
 }
 async function dispatchAction(action){
- if(action==="switch-team"||action==="sign-out"){
+ if(action==="switch-team"||action==="sign-out"||action==="exit-preview"){
+  stopLiveUpdates();
   if(action==="sign-out"&&state.mode==="live"){try{await signOut();}catch(err){toast(err.message);}}
-  state.team=null;state.user=null;state.member=null;state.data=null;state.menu=false;state.modal=null;sessionStorage.removeItem("blueprint-selected-team");render();return;
+  if(action==="exit-preview")state.mode="live";
+  state.team=null;state.member=null;state.data=null;state.menu=false;state.modal=null;state.authNotice="";sessionStorage.removeItem("blueprint-selected-team");
+  if(action==="sign-out")state.user=null;
+  render();return;
  }
+ if(action==="open-preview"){
+  stopLiveUpdates();state.mode="demo";state.team="1810";state.view="overview";state.user=null;state.member=null;state.modal=null;state.menu=false;
+  sessionStorage.setItem("blueprint-selected-team","1810");
+  state.data=workspace("1810");render();return;
+ }
+ if(action==="refresh-live"){await refresh(true);toast("Workspace refreshed.");return;}
  if(action==="menu"){state.menu=!state.menu;render();return;}
  if(action==="close-menu"){state.menu=false;render();return;}
  if(action==="new-task"){if(!canEdit())return;state.editingTaskId=null;state.modal="task";render();return;}
  if(action==="new-log"){if(!canEdit())return;state.modal="log";render();return;}
+ if(action==="new-project"){if(!canEdit())return;state.editingProjectId=null;state.modal="project";render();return;}
+ if(action==="new-event"){if(!canEdit())return;state.modal="event";render();return;}
+ if(action==="new-announcement"){if(!canEdit())return;state.modal="announcement";render();return;}
  if(action==="notifications"){state.modal="notifications";render();return;}
  if(action==="close-modal"){state.modal=null;render();return;}
- if(action==="reset"){state.data=reset(state.team);render();toast("Sample data restored.");return;}
- if(action==="google-signin"){try{await googleSignIn();}catch(err){toast(err.message||"Google sign-in failed.");}return;}
+ if(action==="reset"){if(state.mode!=="demo")return;state.data=reset(state.team);render();toast("Sample data restored.");return;}
+ if(action==="google-signin"){try{await googleSignIn();}catch(err){toast(err.message||"Google sign-in is not available yet.");}return;}
  if(action==="refresh-access"){await refresh();return;}
 }
+
 app.addEventListener("click",async ev=>{
  if(ev.target.closest(".modal")&&ev.target.closest("[data-action]")?.classList.contains("modal-cover"))return;
  const team=ev.target.closest("[data-team]");if(team){await chooseTeam(team.dataset.team);return;}
