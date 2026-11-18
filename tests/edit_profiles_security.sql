@@ -43,7 +43,7 @@ update public.build_logs set title='Reviewed by Lead'
  where id='00000000-0000-4000-8000-000000000110';
 update public.events set title='Lead review scheduled'
  where id='00000000-0000-4000-8000-000000000111';
-do $
+do $$
 begin
  if not exists(select 1 from public.build_logs
   where id='00000000-0000-4000-8000-000000000110'
@@ -55,7 +55,7 @@ begin
     and title='Lead review scheduled' and edited_by=(select auth.uid())) then
   raise exception 'Lead cannot edit a teammate event';
  end if;
-end $;
+end $$;
 
 -- Ordinary member cannot edit team engineering records, but can edit own profile.
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000003',false);
