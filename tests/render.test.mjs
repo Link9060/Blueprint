@@ -72,3 +72,18 @@ test("landing and sample workspace views render without browser dependencies", a
  assert.ok(!html.includes("Viewing as Admin"));
 
 });
+
+test("pending and rejected screens provide secure exit and preview paths", async()=>{
+ const {readFileSync}=await import("node:fs");
+ const source=readFileSync(new URL("../site/app.js",import.meta.url),"utf8");
+ const pending=source.slice(source.indexOf("function waitingPage(){"),source.indexOf("function selectionOptions(",source.indexOf("function waitingPage(){")));
+ const rejected=source.slice(source.indexOf("function rejectedPage(){"),source.indexOf("function connectionPage(){"));
+ const connection=source.slice(source.indexOf("function connectionPage(){"),source.indexOf("function modal(){"));
+ for(const page of [pending,rejected,connection]){
+  assert.match(page,/data-action|button\("Sign out/);
+  assert.ok(page.includes('"sign-out"'),"Must be able to sign out");
+  assert.ok(page.includes('"open-preview"'),"Must allow fictional demo access");
+  assert.ok(page.includes('"refresh-access"'),"Must allow checking approval");
+ }
+ assert.match(pending,/state\.user\?\.email/);
+});

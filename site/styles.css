@@ -49,3 +49,11 @@
 .role-preview-banner .btn{flex:none}
 .role-switch-select:focus-visible{outline:2px solid #91b9c5;outline-offset:3px}
 @media(max-width:700px){.role-preview-banner{padding:12px 15px;align-items:flex-start;flex-direction:column}.role-preview-banner div{align-items:flex-start;flex-direction:column;gap:3px}.setting-row .role-switch{width:100%;max-width:none}}
+
+/* Status pages: make identity and exit routes visible without weakening RLS. */
+.access-account{margin:18px 0 10px;padding:13px 15px;border:1px solid #dce6e9;border-radius:10px;background:#f8fafb;display:flex;gap:8px;flex-direction:column}
+.access-account span{font-size:10px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:#8b9ba2}
+.access-account b{font-size:13px;color:#34424b;overflow-wrap:anywhere}
+.access-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
+.access-actions .btn{flex:1;min-width:150px;white-space:normal;min-height:43px}
+@media(max-width:530px){.access-actions{flex-direction:column}.access-actions .btn{width:100%;min-width:0}}
