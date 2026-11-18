@@ -31,10 +31,12 @@ function patchNode(oldNode,newNode){
   return;
  }
  const active=typeof document!=="undefined"&&document.activeElement===oldNode;
+ const sameFormContext=oldNode.getAttribute("data-form-context")===
+  newNode.getAttribute("data-form-context");
  updateAttrs(oldNode,newNode);
- // Keep the entire existing form draft during background updates, including
- // fields that are filled but not currently focused. A new modal ID replaces it.
- if(oldNode.tagName==="FORM"&&oldNode.id&&oldNode.id===newNode.id)return;
+ // Keep filled form drafts across background updates, but refresh an intentionally
+ // changed form context (for example switching #general to #design).
+ if(oldNode.tagName==="FORM"&&oldNode.id&&oldNode.id===newNode.id&&sameFormContext)return;
  if(oldNode.tagName==="INPUT"){
   if(!active&&oldNode.value!==newNode.value)oldNode.value=newNode.value;
   if(oldNode.checked!==newNode.checked)oldNode.checked=newNode.checked;

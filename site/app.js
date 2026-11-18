@@ -289,7 +289,7 @@ function renderMessages(){
   '</aside><section class="conversation"><div class="chat-head"><b># '+e(state.channel)+'</b><small>Team '+e(state.team)+
   ' · '+(state.mode==="demo"?"Local preview":"Team channel")+'</small></div><div class="messages">'+
   (messages||'<div class="empty">Start the conversation.</div>')+'</div>'+
-  '<form class="compose" id="compose-form"><input class="field" name="body" maxlength="1000" placeholder="Message #'+e(state.channel)+
+  '<form class="compose" id="compose-form" data-form-context="'+e(state.channel)+'"><input class="field" name="body" maxlength="1000" placeholder="Message #'+e(state.channel)+
   '" aria-label="Message" required><button class="btn primary" type="submit">Send '+icon("arrow",14)+'</button></form></section></div>';
 }
 function renderManufacturing(){
