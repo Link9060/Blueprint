@@ -184,7 +184,7 @@ function renderAdmin(){
 }
 
 function renderMessages(){
- const messages=(state.data.messages[state.channel]||[]).map(m=>{
+ const messages=(state.data.messages[state.channel]||[]).filter(m=>!m.hidden||canAdmin()).map(m=>{
   const moderator=canAdmin();
   return '<div class="message '+(m.hidden?"message-muted":"")+'"><div class="avatar">'+e(m.initials||initials(m.author))+'</div>'+
    '<div class="message-content"><div class="message-header"><b>'+e(m.author)+'</b><small>'+e(m.time)+'</small></div>'+
@@ -353,6 +353,44 @@ function modal(){
  }else if(state.modal==="announcement"){
   title="Publish an announcement";description="This update will be visible to every approved member of this team.";
   body='<form id="announcement-form"><div class="form-group"><label for="announce-title">Title</label><input id="announce-title" name="title" class="field" maxlength="140" required placeholder="Short, clear headline"></div><div class="form-group"><label for="announce-body">Message</label><textarea id="announce-body" name="body" class="field" maxlength="2000" required placeholder="What does everyone need to know?"></textarea></div><div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Publish announcement</button></div></form>';
+ }else if(state.modal==="report"){
+  if(!state.reportMessageId)return "";
+  title="Report a team message";
+  description="Only team administrators can review your report. It is not published to the channel.";
+  body='<form id="report-form"><div class="form-group"><label for="report-reason">Reason</label>'+
+   '<select name="reason" id="report-reason" class="field">'+
+   reportReasons.map(x=>'<option value="'+x+'">'+e(x[0].toUpperCase()+x.slice(1))+'</option>').join("")+
+   '</select></div><div class="form-group"><label for="report-note">Optional context</label>'+
+   '<textarea name="note" id="report-note" class="field" maxlength="500" placeholder="What should the administrator review?"></textarea></div>'+
+   '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button>'+
+   '<button type="submit" class="btn primary">Send private report</button></div></form>';
+ }else if(state.modal==="reference"){
+  title="Add engineering reference";
+  description="Link to a CAD revision, drawing, document or source repository. Use an HTTPS link teammates can access.";
+  body='<form id="reference-form"><div class="form-group"><label for="ref-title">Reference title</label>'+
+   '<input id="ref-title" class="field" name="title" maxlength="120" required placeholder="e.g. Intake assembly revision 3"></div>'+
+   '<div class="form-group"><label for="ref-url">HTTPS URL</label>'+
+   '<input id="ref-url" class="field" type="url" name="url" required maxlength="1000" placeholder="https://..."></div>'+
+   '<div class="form-group"><label for="ref-kind">Reference type</label><select id="ref-kind" name="kind" class="field">'+
+   engineeringKinds.map(k=>'<option value="'+k+'">'+e(k[0].toUpperCase()+k.slice(1))+'</option>').join("")+'</select></div>'+
+   '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button>'+
+   '<button type="submit" class="btn primary">Attach reference</button></div></form>';
+ }else if(state.modal==="part"){
+  title="Request manufacturing work";
+  description="Submit a part for review. A team Lead or higher will control its progress.";
+  const options='<option value="">General team request</option>'+state.data.projects.map(p=>'<option value="'+e(p.id)+'">'+e(p.name)+'</option>').join("");
+  body='<form id="part-form"><div class="form-group"><label for="part-name">Part name</label>'+
+   '<input id="part-name" class="field" name="part_name" maxlength="120" required placeholder="e.g. Prototype elevator bracket"></div>'+
+   '<div class="form-duo"><div class="form-group"><label for="part-quantity">Quantity</label>'+
+   '<input id="part-quantity" class="field" type="number" name="quantity" value="1" min="1" max="999" step="1" required></div>'+
+   '<div class="form-group"><label for="part-method">Method</label><select id="part-method" class="field" name="method">'+
+   fabricationMethods.map(m=>'<option value="'+m+'">'+e(fabricationLabels[m])+'</option>').join("")+'</select></div></div>'+
+   '<div class="form-group"><label for="part-project">Linked project</label>'+
+   '<select id="part-project" name="project_id" class="field">'+options+'</select></div>'+
+   '<div class="form-group"><label for="part-notes">Notes</label>'+
+   '<textarea id="part-notes" name="notes" class="field" maxlength="1000" placeholder="Fit requirements, drawing links, or questions for the team lead"></textarea></div>'+
+   '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button>'+
+   '<button type="submit" class="btn primary">Submit request</button></div></form>';
  }else{
   title="Notifications";description="Notifications are not connected yet.";
   body='<p>Optional alerts, email digests and team summaries are planned for a later release. Blueprint will not send them until an administrator enables them.</p>'+button("Close","close-modal");
