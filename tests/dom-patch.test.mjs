@@ -119,6 +119,29 @@ test("active draft input retains value and identity during a background update",
  assert.equal(patchHtml(root,"<div>Unavailable in Node</div>"),false);
 });
 
+test("multiple unsaved form fields remain mounted after unrelated live updates",()=>{
+ const name=el("input",{name:"title",value:"Old title"});
+ const notes=el("textarea",{name:"notes"},[txt("Old notes")]);
+ name.value="My new title";
+ notes.value="Unsubmitted notes from two minutes of work";
+ const form=el("form",{id:"task-edit-form"},[name,notes]);
+ const layout=el("div",{},[form,el("aside",{},[txt("4 team messages")])]);
+ const root=el("div",{},[layout]);
+ patchChildren(root,el("div",{},[
+  el("div",{},[
+   el("form",{id:"task-edit-form"},[
+    el("input",{name:"title",value:"Old title"}),
+    el("textarea",{name:"notes"},[txt("Old notes")])
+   ]),
+   el("aside",{},[txt("5 team messages")])
+  ])
+ ]));
+ assert.equal(root.firstChild.firstChild,form,"Background changes must keep the existing form");
+ assert.equal(name.value,"My new title");
+ assert.equal(notes.value,"Unsubmitted notes from two minutes of work");
+ assert.equal(root.firstChild.childNodes[1].firstChild.nodeValue,"5 team messages");
+});
+
 test("completion animation only follows a confirmed, visible completed state",()=>{
  const set=new Set(["done"]);
  const b={

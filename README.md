@@ -49,6 +49,15 @@ These tests do **not** replace real-browser tests, real Google/email provider ve
 
 Approved teammates can see a member's chosen name, headline, bio, avatar color, and subgroup. Email addresses remain private in Supabase Auth. Members can edit their own profile and approved-team subgroup, not roles or permissions. Managers can edit log/event contents but original authorship is retained, with edits attributed to the editor. Role previews remain visual and read-only.
 
+## Premium workspace polish (v8)
+
+- **Persistent UI:** In-place DOM updates keep the sidebar, scroll position, active controls and unsaved form drafts mounted during most interactions and realtime updates. Changing sections intentionally animates in only the new view.
+- **Responsive controls:** Buttons use lightweight pointer proximity, subtle magnetic movement and click feedback; project surfaces have contextual light accents.
+- **Task completions:** Confirmed successful completions play a checkmark-spring and brief radial burst. Failed backend updates never play a success animation.
+- **Interactive overview:** The drafting compass moves subtly with nearby pointer movement and pulses when clicked.
+- **Accessibility and performance:** Keyboard focus remains visible, toast updates announce via aria-live, animations respect prefers-reduced-motion, and proximity effects are limited to desktop fine pointers. No extra animation framework, analytics, external requests or AI added.
+- **Testing:** Native DOM reconciliation unit tests, UI tests, and database security checks run through GitHub Actions. Browser/device testing remains a separate release validation step.
+
 ## Non-AI coordination release (v7)
 
 - **Task prerequisites:** A Lead or higher can link tasks into prerequisite chains. Blueprint shows unfinished blockers and refuses completion until prerequisites are done. Database triggers reject direct-API bypasses and circular links.
