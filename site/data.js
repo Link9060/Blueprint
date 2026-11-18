@@ -94,11 +94,31 @@ function make(team){
  const reports=[{id:"demo-"+team+"-report",message_id:messages.general[0]?.id,
   reason:"other",note:"Example review item. Not a real report.",status:"open",
   reporter_id:people[1]?.id,created_at:new Date().toISOString()}];
+ const inventory=[
+  {id:"demo-"+team+"-stock-0",name:"M5 socket head bolts",sku:"FAST-M5-20",
+   quantity_on_hand:8,reorder_at:12,unit:"each",storage_location:"Fastener drawer A",
+   notes:"Sample stock count; verify before build"},
+  {id:"demo-"+team+"-stock-1",name:"6061 aluminum tube",sku:"TUBE-6061",
+   quantity_on_hand:2200,reorder_at:800,unit:"mm",storage_location:"Material rack",
+   notes:"Fictional linear stock"}
+ ];
+ const bom=[
+  {id:"demo-"+team+"-bom-0",project_id:projects[0].id,inventory_id:inventory[0].id,
+   quantity_required:16,notes:"Fasteners for frame assembly"},
+  {id:"demo-"+team+"-bom-1",project_id:projects[1].id,inventory_id:inventory[1].id,
+   quantity_required:1200,notes:"Prototype intake rails"}
+ ];
+ const milestones=[
+  {id:"demo-"+team+"-milestone-0",project_id:projects[0].id,title:"Finalize drivetrain mounting",
+   due_on:"2026-12-04",status:"in_progress",notes:"CAD clearance and fit check"},
+  {id:"demo-"+team+"-milestone-1",project_id:projects[0].id,title:"Complete prototype testing",
+   due_on:"2026-12-12",status:"planned",notes:"Document test results"}
+ ];
  const activity=[{id:"demo-"+team+"-audit",action:"reference_added",
   subject_type:"project_links",subject_id:projectLinks[0].id,actor:"Preview User",
   created_at:new Date().toISOString()}];
  return {team,name:base.name,tasks,projects,logs:base.logs,people,pending,
-  projectLinks,partRequests,reports,activity,profile:{full_name:"Preview User",headline:"Building our next robot",bio:"Use this fictional profile to explore the editor.",avatar_color:"blue",subgroup:"Design"},events:clone(commonEvents).map((ev,i)=>({...ev,id:"demo-"+team+"-event-"+i,starts_at:new Date(new Date().getFullYear(),10,Number(ev.day),[15,16,15][i],[30,0,45][i]).toISOString()})),messages};
+  projectLinks,partRequests,reports,activity,inventory,bom,milestones,profile:{full_name:"Preview User",headline:"Building our next robot",bio:"Use this fictional profile to explore the editor.",avatar_color:"blue",subgroup:"Design"},events:clone(commonEvents).map((ev,i)=>({...ev,id:"demo-"+team+"-event-"+i,starts_at:new Date(new Date().getFullYear(),10,Number(ev.day),[15,16,15][i],[30,0,45][i]).toISOString()})),messages};
 }
 export const teams=[{id:"1810",name:"CATATRONICS"},{id:"9316",name:"CUBATRONICS"}];
 export const groups=["Design","Mechanical","Manufacturing","Electrical","Programming","Strategy","Business"];
@@ -116,7 +136,7 @@ export function workspace(team){
    merged.pending=Array.isArray(merged.pending)?merged.pending:fallback.pending;
    merged.events=(merged.events||[]).map((ev,i)=>({...ev,id:ev.id||"demo-"+team+"-event-"+i,starts_at:ev.starts_at||fallback.events[i%fallback.events.length]?.starts_at||""}));
    merged.profile={...fallback.profile,...(merged.profile||{})};
-   for(const key of ["projectLinks","partRequests","reports","activity"]){
+   for(const key of ["projectLinks","partRequests","reports","activity","inventory","bom","milestones"]){
      merged[key]=Array.isArray(merged[key])?merged[key]:fallback[key];
    }
    for(const channel of channels){
