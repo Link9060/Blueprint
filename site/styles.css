@@ -159,3 +159,34 @@
 @media(max-width:950px){.manufacture-board{grid-template-columns:1fr}}
 @media(max-width:650px){.manufacture-item{padding:18px}.manufacture-update{align-items:stretch;flex-direction:column}.manufacture-update select{width:100%}.report-actions{flex-direction:column}.report-actions .btn{width:100%}.activity-row{align-items:flex-start;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){.subtle-action,.reference-line a{transition:none}}
+
+
+/* v6: connected inventory, planned BOM requirements and project milestones */
+.planning-summary{display:flex;flex-wrap:wrap;gap:9px;margin:0 0 19px}
+.planning-summary>span{border:1px solid #dce5e9;background:#f7fafb;padding:9px 12px;border-radius:9px;font-size:11px;font-weight:650;color:#526e7a}
+.stock-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}
+.stock-card{padding:23px;min-width:0;display:flex;flex-direction:column;gap:13px}
+.stock-card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.stock-card-top h3{font-size:17px;letter-spacing:-.35px;margin:8px 0 5px;overflow-wrap:anywhere}
+.stock-card-top small{display:block;font-size:11px;line-height:1.6;color:#80939d}
+.stock-card-top .pill{flex:none;max-width:46%;text-align:center;line-height:1.4;white-space:normal}
+.stock-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;border-top:1px solid #e5edf0;border-bottom:1px solid #e5edf0;padding:14px 0}
+.stock-stat{display:flex;flex-direction:column;gap:6px;min-width:0}
+.stock-stat small{font-size:9px;color:#8a9da5;line-height:1.45}
+.stock-stat b{font-size:17px;letter-spacing:-.3px;color:#344e5d;font-variant-numeric:tabular-nums}
+.stock-notes{margin:0;color:#667d86;line-height:1.7;font-size:11px;overflow-wrap:anywhere}
+.stock-card>.btn{align-self:flex-start;margin-top:auto}
+.shortage-text{color:#9b5946;font-weight:760}
+.planning-panel{padding-top:14px;border-top:1px solid #e1e9ec;display:flex;flex-direction:column;gap:9px;margin-top:14px;min-width:0}
+.planning-panel-heading{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.planning-panel-heading b{font-size:9px;letter-spacing:1.1px;font-weight:800;color:#8397a2}
+.planning-panel-heading span{font-size:10px;color:#728995;white-space:nowrap}
+.planning-line{display:flex;justify-content:space-between;align-items:flex-start;gap:9px;min-width:0;border-left:2px solid #d8e6eb;padding-left:9px}
+.planning-line>div{flex:1;min-width:0}
+.planning-line b{display:block;font-size:11px;font-weight:700;line-height:1.45;overflow-wrap:anywhere;color:#3f5660}
+.planning-line small{display:block;margin-top:3px;font-size:10px;line-height:1.6;color:#81949d;overflow-wrap:anywhere}
+.planning-line .subtle-action{flex:none;margin-left:auto}
+.planning-panel>.btn{align-self:flex-start;margin-top:3px}
+.planning-readonly{background:#f4f7f9!important;color:#627782;padding:11px 12px;min-height:40px;word-break:break-word}
+@media(max-width:950px){.stock-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:560px){.stock-card{padding:18px}.stock-card-top{flex-direction:column;align-items:flex-start}.stock-card-top .pill{max-width:100%}.planning-summary{gap:7px}.planning-summary>span{font-size:10px;padding:8px 10px}}
