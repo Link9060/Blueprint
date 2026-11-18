@@ -131,6 +131,7 @@ reset role;
 
 -- Owner bootstrap occurs only with trusted Postgres administrative access.
 reset role;
+select set_config('request.jwt.claim.sub','',false);
 update public.team_memberships set role='owner'
  where team_id='1810' and user_id='00000000-0000-4000-8000-000000000001';
 set role authenticated;
@@ -158,5 +159,34 @@ begin
  exception when others then denied:=true;
  end;
  if not denied then raise exception 'Owner account was demoted via authenticated client'; end if;
+end $$;
+reset role;
+
+-- An administrator cannot promote anyone to Owner or demote existing Owners.
+reset role;
+select set_config('request.jwt.claim.sub','',false);
+insert into auth.users(id) values ('00000000-0000-4000-8000-000000000006');
+insert into public.profiles(id,full_name)
+ values ('00000000-0000-4000-8000-000000000006','Test Admin Two');
+insert into public.team_memberships(team_id,user_id,role,subgroup,status)
+ values ('1810','00000000-0000-4000-8000-000000000006','admin','Design','approved');
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000006',false);
+do $$
+declare denied boolean := false;
+begin
+ begin
+  update public.team_memberships set role='owner'
+  where team_id='1810' and user_id='00000000-0000-4000-8000-000000000002';
+ exception when others then denied:=true;
+ end;
+ if not denied then raise exception 'Admin elevated a user to Owner'; end if;
+ denied:=false;
+ begin
+  update public.team_memberships set status='rejected'
+  where team_id='1810' and user_id='00000000-0000-4000-8000-000000000001';
+ exception when others then denied:=true;
+ end;
+ if not denied then raise exception 'Admin disabled Owner account'; end if;
 end $$;
 reset role;

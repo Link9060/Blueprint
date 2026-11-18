@@ -29,3 +29,23 @@
 @media(max-width:770px){.approval-row{flex-wrap:wrap}.approval-info{min-width:calc(100% - 55px)}.role-select{flex:1}.approval-actions{flex:1;justify-content:flex-end}}
 @media(max-width:530px){.form-duo{grid-template-columns:1fr}.approval-row{align-items:start}.approval-actions{width:100%}.approval-actions .btn{flex:1}.task-toolbar{align-items:start;flex-direction:column;gap:11px}.task-toolbar .filter-row{gap:2px}.scope-switch{width:100%}.scope-switch button{flex:1}}
 @media(prefers-reduced-motion:reduce){.card:not(.stat)::after{animation:none}}
+
+
+/* Quiet role inspector, visible only to Owners and the fictional demo. */
+.role-switch{margin:12px 13px 17px;padding:13px;border:1px solid #ffffff24;border-radius:10px;background:#ffffff07;display:flex;flex-direction:column;gap:6px;min-width:0}
+.role-switch label{color:#bfcbd0;font-size:9px;font-weight:750;letter-spacing:1.35px}
+.role-switch-select{appearance:auto;width:100%;min-width:0;border:1px solid #ffffff24;border-radius:7px;background:#1d2b31;color:#edf4f4;padding:9px 8px;font-family:inherit;font-size:11px;font-weight:600;cursor:pointer}
+.role-switch-select option{background:#1d2b31;color:#f3f6f7}
+.role-switch small{font-size:9px;color:#8ca0a7}
+.setting-row .role-switch{margin:0;min-width:190px;max-width:290px;border-color:#dce5e8;background:#f4f7f8}
+.setting-row .role-switch label{color:#788992}
+.setting-row .role-switch small{color:#8b99a1}
+.setting-row .role-switch-select{background:#fff;color:#31434d;border-color:#d7e2e6}
+.setting-row .role-switch-select option{background:white;color:#31434d}
+.role-preview-banner{border-bottom:1px solid #dce5e6;background:#f4f7f6;display:flex;gap:16px;align-items:center;justify-content:space-between;padding:13px 23px;color:#394e54}
+.role-preview-banner div{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.role-preview-banner b{font-size:12px;letter-spacing:-.1px}
+.role-preview-banner span{font-size:11px;color:#6f8387;line-height:1.6}
+.role-preview-banner .btn{flex:none}
+.role-switch-select:focus-visible{outline:2px solid #91b9c5;outline-offset:3px}
+@media(max-width:700px){.role-preview-banner{padding:12px 15px;align-items:flex-start;flex-direction:column}.role-preview-banner div{align-items:flex-start;flex-direction:column;gap:3px}.setting-row .role-switch{width:100%;max-width:none}}

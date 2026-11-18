@@ -53,4 +53,22 @@ test("landing and sample workspace views render without browser dependencies", a
  assert.ok(html.includes('id="announcement-form"'));
  await handlers.submit({target:{id:"announcement-form",values:{title:"Demo briefing",body:"An example update"}} ,preventDefault(){}});
  assert.ok(html.includes("Demo briefing"));
+
+ // The role inspector must hide admin tools in the Member view and never grant
+ // or change server-side permissions.
+ const selectRole=role=>({
+  value:role,
+  closest:query=>query==="[data-preview-role]"?{value:role}:null
+ });
+ await handlers.change({target:selectRole("member")});
+ assert.ok(html.includes("Viewing as Member"));
+ assert.ok(!html.includes('data-view="admin"'));
+ await handlers.click(action("new-project"));
+ assert.ok(!html.includes('id="project-form"'),"preview must remain read-only");
+ await handlers.change({target:selectRole("admin")});
+ assert.ok(html.includes("Viewing as Admin"));
+ assert.ok(html.includes('data-view="admin"'));
+ await handlers.change({target:selectRole("actual")});
+ assert.ok(!html.includes("Viewing as Admin"));
+
 });
