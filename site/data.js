@@ -114,11 +114,22 @@ function make(team){
   {id:"demo-"+team+"-milestone-1",project_id:projects[0].id,title:"Complete prototype testing",
    due_on:"2026-12-12",status:"planned",notes:"Document test results"}
  ];
+ const taskDependencies=[{team_id:team,task_id:"t2",prerequisite_id:"t1"}];
+ const events=clone(commonEvents).map((ev,i)=>({
+  ...ev,id:"demo-"+team+"-event-"+i,
+  starts_at:new Date(new Date().getFullYear(),10,Number(ev.day),[15,16,15][i],[30,0,45][i]).toISOString()
+ }));
+ const eventChecklist=[
+  {id:"demo-"+team+"-check-0",event_id:events[0].id,title:"Verify tool kit is packed",
+   category:"packing",notes:"Preview checklist item",assigned_to:people[0]?.id,status:"todo"},
+  {id:"demo-"+team+"-check-1",event_id:events[0].id,title:"Confirm pit supplies",
+   category:"pit",notes:"Fictional supplies",assigned_to:people[1]?.id,status:"done"}
+ ];
  const activity=[{id:"demo-"+team+"-audit",action:"reference_added",
   subject_type:"project_links",subject_id:projectLinks[0].id,actor:"Preview User",
   created_at:new Date().toISOString()}];
  return {team,name:base.name,tasks,projects,logs:base.logs,people,pending,
-  projectLinks,partRequests,reports,activity,inventory,bom,milestones,profile:{full_name:"Preview User",headline:"Building our next robot",bio:"Use this fictional profile to explore the editor.",avatar_color:"blue",subgroup:"Design"},events:clone(commonEvents).map((ev,i)=>({...ev,id:"demo-"+team+"-event-"+i,starts_at:new Date(new Date().getFullYear(),10,Number(ev.day),[15,16,15][i],[30,0,45][i]).toISOString()})),messages};
+  projectLinks,partRequests,reports,activity,inventory,bom,milestones,taskDependencies,eventChecklist,profile:{full_name:"Preview User",headline:"Building our next robot",bio:"Use this fictional profile to explore the editor.",avatar_color:"blue",subgroup:"Design"},events,messages};
 }
 export const teams=[{id:"1810",name:"CATATRONICS"},{id:"9316",name:"CUBATRONICS"}];
 export const groups=["Design","Mechanical","Manufacturing","Electrical","Programming","Strategy","Business"];
@@ -136,7 +147,7 @@ export function workspace(team){
    merged.pending=Array.isArray(merged.pending)?merged.pending:fallback.pending;
    merged.events=(merged.events||[]).map((ev,i)=>({...ev,id:ev.id||"demo-"+team+"-event-"+i,starts_at:ev.starts_at||fallback.events[i%fallback.events.length]?.starts_at||""}));
    merged.profile={...fallback.profile,...(merged.profile||{})};
-   for(const key of ["projectLinks","partRequests","reports","activity","inventory","bom","milestones"]){
+   for(const key of ["projectLinks","partRequests","reports","activity","inventory","bom","milestones","taskDependencies","eventChecklist"]){
      merged[key]=Array.isArray(merged[key])?merged[key]:fallback[key];
    }
    for(const channel of channels){
