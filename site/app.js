@@ -583,7 +583,7 @@ async function chooseTeam(team){
 }
 async function dispatchAction(action){
  if(action==="end-role-preview"){state.rolePreview=null;state.modal=null;render();return;}
- if(previewReadOnly()&&["new-task","new-log","new-project","new-event","new-announcement","new-part","reset"].includes(action))return toast("Role preview is read-only. Exit preview to make changes.");
+ if(previewReadOnly()&&["new-task","new-log","new-project","new-event","new-announcement","new-part","new-stock","reset"].includes(action))return toast("Role preview is read-only. Exit preview to make changes.");
  if(action==="switch-team"||action==="sign-out"||action==="exit-preview"){
   stopLiveUpdates();state.rolePreview=null;
   if(action==="sign-out"&&state.mode==="live"){try{await signOut();}catch(err){toast(err.message);}}
@@ -606,6 +606,7 @@ async function dispatchAction(action){
  if(action==="new-event"){if(!canEdit())return;state.editingEventId=null;state.modal="event";render();return;}
  if(action==="new-announcement"){if(!canEdit())return;state.modal="announcement";render();return;}
  if(action==="new-part"){state.modal="part";render();return;}
+ if(action==="new-stock"){if(!canEdit())return;state.editingStockId=null;state.modal="stock";render();return;}
  if(action==="open-profile"){state.view="profile";state.menu=false;state.modal=null;render();return;}
  if(action==="notifications"){state.modal="notifications";render();return;}
  if(action==="close-modal"){state.modal=null;render();return;}
@@ -653,6 +654,39 @@ app.addEventListener("click",async ev=>{
    toast(status==="approved"?"Membership approved.":"Request rejected.");
   }catch(err){toast("Unable to update request: "+err.message);}
   return;
+ }
+ const stockEdit=ev.target.closest("[data-edit-stock]");
+ if(stockEdit){
+  if(previewReadOnly()||!canEdit())return;
+  state.editingStockId=stockEdit.dataset.editStock;state.modal="stock-edit";render();return;
+ }
+ const bomAdd=ev.target.closest("[data-add-bom]");
+ if(bomAdd){
+  if(previewReadOnly()||!canEdit())return;
+  if(!(state.data.inventory||[]).length)return toast("Add a stock item in Inventory before linking it to a BOM.");
+  state.planningProjectId=bomAdd.dataset.addBom;state.editingBomId=null;state.modal="bom";render();return;
+ }
+ const bomEdit=ev.target.closest("[data-edit-bom]");
+ if(bomEdit){
+  if(previewReadOnly()||!canEdit())return;
+  const line=state.data.bom.find(x=>String(x.id)===bomEdit.dataset.editBom);
+  if(!line)return;
+  state.planningProjectId=line.project_id;state.editingBomId=line.id;
+  state.modal="bom-edit";render();return;
+ }
+ const milestoneAdd=ev.target.closest("[data-add-milestone]");
+ if(milestoneAdd){
+  if(previewReadOnly()||!canEdit())return;
+  state.planningProjectId=milestoneAdd.dataset.addMilestone;
+  state.editingMilestoneId=null;state.modal="milestone";render();return;
+ }
+ const milestoneEdit=ev.target.closest("[data-edit-milestone]");
+ if(milestoneEdit){
+  if(previewReadOnly()||!canEdit())return;
+  const m=state.data.milestones.find(x=>String(x.id)===milestoneEdit.dataset.editMilestone);
+  if(!m)return;
+  state.planningProjectId=m.project_id;state.editingMilestoneId=m.id;
+  state.modal="milestone-edit";render();return;
  }
  const reportButton=ev.target.closest("[data-report-message]");
  if(reportButton){
