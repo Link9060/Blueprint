@@ -24,8 +24,8 @@ test("landing and sample workspace views render without browser dependencies", a
  await handlers.click({target:fakeTarget("[data-team]","team","1810")});
  assert.match(html,/A clearer way to build/);
  for(const [view,signature] of [
-  ["tasks","Tasks & assignments"],
-  ["projects","Projects & subsystems"],
+  ["tasks","Tasks &amp; assignments"],
+  ["projects","Projects &amp; subsystems"],
   ["calendar","Schedule"],
   ["announcements","Announcements"],
   ["admin","Membership review"],
