@@ -8,11 +8,12 @@
 
 - The new dedicated Supabase project is created and marked `ACTIVE_HEALTHY`.
 - `site/config.js` points to that project using its browser-safe publishable key.
-- Applied two database migrations to the dedicated project:
+- Applied two application database migrations to the dedicated project:
   - `blueprint_core_teams_membership_and_workspace_v1`: teams, profiles, memberships, tasks, projects, logs, messages, events, authorization routines and RLS.
   - `blueprint_announcements_project_events_realtime_v2`: announcements, manager editing policies, Realtime publication.
 - Created teams 1810 and 9316. No real users, student details, tasks or messages were seeded by the migration.
 - Verified anonymous table reads are revoked and RLS is on for all team tables.
+- Restricted the Supabase-provisioned `public.rls_auto_enable()` event-trigger function from `anon` and `authenticated` role execution; Supabase Security Advisors then reported no findings.
 - Automated CI tests include browserless interface checks and simulated PostgreSQL RLS checks.
 
 ## Step 1: Allow Blueprint authentication redirects

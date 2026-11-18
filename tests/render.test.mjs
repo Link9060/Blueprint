@@ -35,4 +35,22 @@ test("landing and sample workspace views render without browser dependencies", a
   await handlers.click({target:fakeTarget("[data-view]","view",view)});
   assert.ok(html.includes(signature),"Missing "+view+" view");
  }
+
+ // Verify modal forms and local demo save flows, without contacting the live database.
+ const action = value=>({target:fakeTarget("[data-action]","action",value)});
+ await handlers.click(action("new-project"));
+ assert.ok(html.includes('id="project-form"'));
+ globalThis.FormData=class{constructor(form){this.value=form.values;}get(key){return this.value[key]??null;}};
+ globalThis.document.createElement=()=>({className:"",textContent:"",remove(){}});
+ globalThis.document.body={append:()=>{}};
+ await handlers.submit({target:{id:"project-form",values:{name:"Prototype Frame",description:"Demo only",subgroup:"Design",progress:"0"}},preventDefault(){}});
+ assert.ok(html.includes("Prototype Frame"));
+ await handlers.click(action("new-event"));
+ assert.ok(html.includes('id="event-form"'));
+ await handlers.submit({target:{id:"event-form",values:{title:"Demo review",start:"2026-11-20T17:00"}},preventDefault(){}});
+ assert.ok(html.includes("Demo review"));
+ await handlers.click(action("new-announcement"));
+ assert.ok(html.includes('id="announcement-form"'));
+ await handlers.submit({target:{id:"announcement-form",values:{title:"Demo briefing",body:"An example update"}} ,preventDefault(){}});
+ assert.ok(html.includes("Demo briefing"));
 });
