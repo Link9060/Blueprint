@@ -81,7 +81,24 @@ function make(team){
  const tasks=base.tasks.map((t,i)=>({...t,assigned_to:i<3?people[i%people.length]?.id:null,priority:t.priority||"Normal",due_date:""}));
  const projects=base.projects.map((p,i)=>({...p,id:"demo-"+team+"-project-"+i,subgroup:p.lead}));
  const pending=[{user_id:"demo-pending-"+team,name:"Jamie L.",subgroup:"Design",role:"member",status:"pending"}];
- return {team,name:base.name,tasks,projects,logs:base.logs,people,pending,profile:{full_name:"Preview User",headline:"Building our next robot",bio:"Use this fictional profile to explore the editor.",avatar_color:"blue",subgroup:"Design"},events:clone(commonEvents).map((ev,i)=>({...ev,id:"demo-"+team+"-event-"+i,starts_at:new Date(new Date().getFullYear(),10,Number(ev.day),[15,16,15][i],[30,0,45][i]).toISOString()})),messages:clone(initialMessages)};
+ const messages=clone(initialMessages);
+ for(const [channel,items] of Object.entries(messages)){
+  messages[channel]=items.map((m,i)=>({...m,id:"demo-"+team+"-"+channel+"-"+i,hidden:false}));
+ }
+ const projectLinks=[{id:"demo-"+team+"-cad",project_id:projects[0].id,
+  title:"Drivetrain CAD workspace",url:"https://www.onshape.com/",kind:"cad"}];
+ const partRequests=[{id:"demo-"+team+"-part-1",project_id:projects[1].id,
+  part_name:"Prototype intake bracket",quantity:2,method:"3d_print",status:"requested",
+  notes:"Fictional fixture. Confirm dimensions before fabrication.",requested_by:people[0]?.id,
+  created_at:new Date().toISOString()}];
+ const reports=[{id:"demo-"+team+"-report",message_id:messages.general[0]?.id,
+  reason:"other",note:"Example review item. Not a real report.",status:"open",
+  reporter_id:people[1]?.id,created_at:new Date().toISOString()}];
+ const activity=[{id:"demo-"+team+"-audit",action:"reference_added",
+  subject_type:"project_links",subject_id:projectLinks[0].id,actor:"Preview User",
+  created_at:new Date().toISOString()}];
+ return {team,name:base.name,tasks,projects,logs:base.logs,people,pending,
+  projectLinks,partRequests,reports,activity,profile:{full_name:"Preview User",headline:"Building our next robot",bio:"Use this fictional profile to explore the editor.",avatar_color:"blue",subgroup:"Design"},events:clone(commonEvents).map((ev,i)=>({...ev,id:"demo-"+team+"-event-"+i,starts_at:new Date(new Date().getFullYear(),10,Number(ev.day),[15,16,15][i],[30,0,45][i]).toISOString()})),messages};
 }
 export const teams=[{id:"1810",name:"CATATRONICS"},{id:"9316",name:"CUBATRONICS"}];
 export const groups=["Design","Mechanical","Manufacturing","Electrical","Programming","Strategy","Business"];
@@ -99,6 +116,14 @@ export function workspace(team){
    merged.pending=Array.isArray(merged.pending)?merged.pending:fallback.pending;
    merged.events=(merged.events||[]).map((ev,i)=>({...ev,id:ev.id||"demo-"+team+"-event-"+i,starts_at:ev.starts_at||fallback.events[i%fallback.events.length]?.starts_at||""}));
    merged.profile={...fallback.profile,...(merged.profile||{})};
+   for(const key of ["projectLinks","partRequests","reports","activity"]){
+     merged[key]=Array.isArray(merged[key])?merged[key]:fallback[key];
+   }
+   for(const channel of channels){
+     merged.messages[channel]=(merged.messages[channel]||[]).map((m,i)=>({
+      ...m,id:m.id||"demo-"+team+"-"+channel+"-"+i,hidden:!!m.hidden
+     }));
+   }
    return merged;
  }catch{return fallback;}
 }
