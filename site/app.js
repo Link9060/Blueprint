@@ -769,6 +769,55 @@ app.addEventListener("click",async ev=>{
   state.planningProjectId=m.project_id;state.editingMilestoneId=m.id;
   state.modal="milestone-edit";render();return;
  }
+ const dependencyAdd=ev.target.closest("[data-add-dependency]");
+ if(dependencyAdd){
+  if(previewReadOnly()||!canEdit())return;
+  state.dependencyTaskId=dependencyAdd.dataset.addDependency;
+  state.modal="dependency";render();return;
+ }
+ const dependencyRemove=ev.target.closest("[data-remove-dependency]");
+ if(dependencyRemove){
+  if(previewReadOnly()||!canEdit()||state.modal!=="dependency")return;
+  const taskId=state.dependencyTaskId,prerequisiteId=dependencyRemove.dataset.removeDependency;
+  try{
+   if(state.mode==="demo"){
+    state.data.taskDependencies=state.data.taskDependencies.filter(x=>!(x.task_id===taskId&&x.prerequisite_id===prerequisiteId));
+    save(state.team,state.data);render();
+   }else{
+    await removeTaskDependency(state.team,taskId,prerequisiteId);
+    await refresh(true);
+   }
+   toast("Prerequisite removed.");
+  }catch(err){toast("Could not unlink prerequisite: "+err.message);}
+  return;
+ }
+ const checklistAdd=ev.target.closest("[data-add-checklist]");
+ if(checklistAdd){
+  if(previewReadOnly()||!canEdit())return;
+  state.checklistEventId=checklistAdd.dataset.addChecklist;
+  state.editingChecklistId=null;state.modal="checklist";render();return;
+ }
+ const checklistEdit=ev.target.closest("[data-edit-checklist]");
+ if(checklistEdit){
+  if(previewReadOnly()||!canEdit())return;
+  const item=state.data.eventChecklist.find(x=>String(x.id)===checklistEdit.dataset.editChecklist);
+  if(!item)return;
+  state.checklistEventId=item.event_id;
+  state.editingChecklistId=item.id;state.modal="checklist-edit";render();return;
+ }
+ const checklistToggle=ev.target.closest("[data-checklist-toggle]");
+ if(checklistToggle){
+  const item=state.data.eventChecklist.find(x=>String(x.id)===checklistToggle.dataset.checklistToggle);
+  if(!item)return;
+  if(!canToggleChecklist(item))return toast("Only the assigned teammate or a Lead may check off this item.");
+  const status=item.status==="done"?"todo":"done";
+  try{
+   if(state.mode==="demo"){item.status=status;save(state.team,state.data);render();}
+   else{await setChecklistStatus(state.team,item.id,status);await refresh(true);}
+   toast(status==="done"?"Checklist item completed.":"Checklist item reopened.");
+  }catch(err){toast("Checklist update rejected: "+(err.message||"Unknown error"));}
+  return;
+ }
  const reportButton=ev.target.closest("[data-report-message]");
  if(reportButton){
   if(previewReadOnly())return toast("Exit role preview before reporting.");
