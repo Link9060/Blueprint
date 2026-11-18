@@ -1,57 +1,50 @@
 # Blueprint
 
-A quieter, more organized place to build robots.
+A focused, quietly designed workspace for FRC robotics teams **1810** and **9316**.
 
-Blueprint is a browser-based robotics team workspace for FRC teams **1810 (CATATRONICS)** and **9316 (CUBATRONICS)**. It is designed around real engineering work: tasks, subsystem progress, build logs, announcements, scheduling, and subgroup conversations.
+**Website:** https://link9060.github.io/Blueprint/  
+**Dedicated Supabase:** \`Resonant. Blueprint\` (\`weaytuxrcanwdbpcmlce\`)
 
-## First-release features
+## Live foundation
 
-- Team selection and a responsive, accessible workspace
-- Overview dashboard, task ownership and due dates, role-aware editing, and a personal task view
-- Structured build logs and robot subsystem cards
-- Subgroup discussion channels and team directory
-- Calendar and workspace settings
-- Fast drafting-style line animations with reduced-motion support
-- Local demo data so teams can review the design safely
-- Optional Supabase adapter with Google OAuth, administrator membership approval, team directory and RLS
-- GitHub Actions workflow to publish the static site to GitHub Pages
-- PostgreSQL integration tests that apply the schema and verify team/member access boundaries in a temporary CI database
+- Private team selection and role-aware member access
+- Google sign-in integration (requires Google OAuth provider setup) and email magic-link option (requires redirect allowlisting)
+- New memberships start **pending** until a trusted team administrator approves them
+- Team dashboards with tasks, owners, priorities, statuses, due dates and progress
+- Build logs and subsystem project creation/editing
+- Team announcements, meeting and event scheduling
+- Team-scoped channels, with RLS-protected Supabase Realtime updates
+- Approved member directory and administrator approval/role editor
+- Fictional sample workspace available without signing in
+- Responsive dark sidebar + light workspace with understated drafting animations, and reduced-motion support
 
-**Important:** The public preview defaults to fictional data. It is **not** connected to your real team's information. Until a dedicated Supabase project is configured, Google sign-in and live collaboration are not active. Chat in preview is local to your browser.
-
-## Preview
-
-After enabling GitHub Pages with **GitHub Actions** as the source:
-
-https://link9060.github.io/Blueprint/
-
-Source: https://github.com/Link9060/Blueprint
+**Important:** Connecting the database does not mean onboarding is complete. See **docs/SETUP.md** for the remaining authentication configuration and authorized first-admin setup. User-facing flows must be tested with separate test accounts before handling real student data.
 
 ## Architecture
 
-- **Frontend:** dependency-free HTML, CSS and ES modules, hosted on GitHub Pages
-- **Presentation:** site/app.js and site/styles.css
-- **Demo store:** site/data.js, isolated per team in localStorage
-- **Production adapter:** site/supabase.js, SDK loaded only if configured
-- **Schema:** database/schema.sql with row-level security on every public table
-- **Automation:** .github/workflows/pages.yml
+| Layer | Location |
+|---|---|
+| Static frontend | \`site/index.html\`, \`site/app.js\`, \`site/styles.css\` |
+| Supabase adapter | \`site/supabase.js\` |
+| Browser-safe project configuration | \`site/config.js\` |
+| Fictional preview fixtures | \`site/data.js\` |
+| Base team/RLS schema | \`database/schema.sql\` |
+| Announcements and realtime extension | \`database/upgrade_v2.sql\` |
+| GitHub Pages deployment | \`.github/workflows/pages.yml\` |
+| Automated CI | \`.github/workflows/ci.yml\`, \`tests/\` |
 
-This lean first release avoids build dependencies and gives the team a stable Pages deployment. The data and presentation layers are deliberately separated to allow future expansion.
+The site uses a pinned browser version of supabase-js. Its publishable key is public by design; no service-role key or Google OAuth secret belongs in the repository. All real team data is protected by database row-level security and role restrictions.
 
-See **docs/SETUP.md** for publication, secure Supabase setup and the next milestones.
+## Tested
 
-## Roadmap
+CI runs JavaScript syntax and interface smoke tests, fixture separation checks, and a temporary PostgreSQL database with simulated Supabase Auth. It applies both schema files and checks permissions for pending members, approved members, team leads, administrators and users on opposite teams.
 
-1. Review UI with mentors and team leads.
-2. Set up a dedicated Supabase project and approve initial administrators.
-3. Add real-time subscriptions, announcements, audit history and moderation controls.
-4. Add CAD links, inventory, manufacturing handoffs, competition mode and structured nightly summaries.
+These tests do **not** replace real-browser tests, real Google/email provider verification, or school mentor approval.
 
-Team member safety and access control are prerequisites before using Blueprint with real student data.
+## Next milestones
 
-## Quality gates
-
-In addition to the JavaScript and fixture tests, the `database` CI job runs PostgreSQL 16, installs the schema, then checks member/admin/pending-team isolation, task status authorization and cross-team message denial. This is a simulated Supabase auth environment, not a live Supabase project.
-
-
-`Blueprint CI` validates JavaScript syntax, deterministic demo isolation, and key schema security assumptions on development branches and pull requests. The `Publish Blueprint` workflow runs the same checks before deploying `main`. It cannot replace a real multi-account Supabase authorization test, which is required before onboarding students.
+1. Complete Supabase authentication URL configuration and Google provider credentials.
+2. Bootstrap first authorized administrator per team, then test pending/approved cross-team access with separate accounts.
+3. Add message reporting and moderation, administrative audit history, and account-access recovery before widespread student onboarding.
+4. Add CAD/file linking, manufacturing requests, inventory and competition preparation.
+5. Add opt-in, reviewed nightly summaries. No AI messages or outbound notifications are generated by this release.
