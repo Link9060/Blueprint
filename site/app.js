@@ -327,6 +327,7 @@ async function refresh(quiet=false){
   if(state.team!==requestedTeam)return;
   state.user=user;
   state.member=user?await membership(requestedTeam,user.id):null;
+  state.profile=user?await getLiveProfile(user.id):null;
   if(state.mode==="live"&&state.member?.role!=="owner")state.rolePreview=null;
   state.data=state.member?.status==="approved"?await liveWorkspace(requestedTeam):null;
   state.error="";
@@ -367,12 +368,12 @@ async function dispatchAction(action){
   stopLiveUpdates();state.rolePreview=null;
   if(action==="sign-out"&&state.mode==="live"){try{await signOut();}catch(err){toast(err.message);}}
   if(action==="exit-preview")state.mode="live";
-  state.team=null;state.member=null;state.data=null;state.menu=false;state.modal=null;state.authNotice="";sessionStorage.removeItem("blueprint-selected-team");
+  state.team=null;state.member=null;state.data=null;state.profile=null;state.menu=false;state.modal=null;state.authNotice="";sessionStorage.removeItem("blueprint-selected-team");
   if(action==="sign-out")state.user=null;
   render();return;
  }
  if(action==="open-preview"){
-  stopLiveUpdates();state.rolePreview=null;state.mode="demo";state.team="1810";state.view="overview";state.user=null;state.member=null;state.modal=null;state.menu=false;
+  stopLiveUpdates();state.rolePreview=null;state.mode="demo";state.team="1810";state.view="overview";state.user=null;state.member=null;state.profile=null;state.modal=null;state.menu=false;
   sessionStorage.setItem("blueprint-selected-team","1810");
   state.data=workspace("1810");render();return;
  }
@@ -380,10 +381,11 @@ async function dispatchAction(action){
  if(action==="menu"){state.menu=!state.menu;render();return;}
  if(action==="close-menu"){state.menu=false;render();return;}
  if(action==="new-task"){if(!canEdit())return;state.editingTaskId=null;state.modal="task";render();return;}
- if(action==="new-log"){if(!canEdit())return;state.modal="log";render();return;}
+ if(action==="new-log"){if(!canEdit())return;state.editingLogId=null;state.modal="log";render();return;}
  if(action==="new-project"){if(!canEdit())return;state.editingProjectId=null;state.modal="project";render();return;}
- if(action==="new-event"){if(!canEdit())return;state.modal="event";render();return;}
+ if(action==="new-event"){if(!canEdit())return;state.editingEventId=null;state.modal="event";render();return;}
  if(action==="new-announcement"){if(!canEdit())return;state.modal="announcement";render();return;}
+ if(action==="open-profile"){state.view="profile";state.menu=false;state.modal=null;render();return;}
  if(action==="notifications"){state.modal="notifications";render();return;}
  if(action==="close-modal"){state.modal=null;render();return;}
  if(action==="reset"){if(state.mode!=="demo")return;state.data=reset(state.team);render();toast("Sample data restored.");return;}
@@ -399,6 +401,14 @@ app.addEventListener("click",async ev=>{
  const scope=ev.target.closest("[data-task-scope]");if(scope){state.taskScope=scope.dataset.taskScope;render();return;}
  const channel=ev.target.closest("[data-channel]");if(channel){state.channel=channel.dataset.channel;render();return;}
  const edit=ev.target.closest("[data-edit-task]");if(edit&&canEdit()){state.editingTaskId=edit.dataset.editTask;state.modal="task-edit";render();return;}
+ const logEdit=ev.target.closest("[data-edit-log]");
+ if(logEdit&&canEdit()&&!previewReadOnly()){
+  state.editingLogId=logEdit.dataset.editLog;state.modal="log-edit";render();return;
+ }
+ const eventEdit=ev.target.closest("[data-edit-event]");
+ if(eventEdit&&canEdit()&&!previewReadOnly()){
+  state.editingEventId=eventEdit.dataset.editEvent;state.modal="event-edit";render();return;
+ }
  const project=ev.target.closest("[data-edit-project]");
  if(project&&canEdit()){state.editingProjectId=project.dataset.editProject;state.modal="project-edit";render();return;}
  const decision=ev.target.closest("[data-decision]");
@@ -458,7 +468,7 @@ app.addEventListener("change",async ev=>{
  }catch(err){toast("Role update failed: "+(err.message||"Unknown error"));await refresh(true);}
 });
 app.addEventListener("submit",async ev=>{
- const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form"].includes(form.id))return;
+ const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form","profile-form"].includes(form.id))return;
  ev.preventDefault();if(previewReadOnly())return toast("Role preview is read-only. Exit preview to save changes.");const f=new FormData(form);
  try{
  if(form.id==="magic-link-form"){
@@ -471,6 +481,29 @@ app.addEventListener("submit",async ev=>{
   const name=String(f.get("name")||"").trim().slice(0,80),subgroup=String(f.get("subgroup")||"");
   if(!name||!groups.includes(subgroup))return toast("Enter a valid name and subgroup.");
   await requestMembership(state.team,state.user,name,subgroup);await refresh();toast("Access request submitted.");return;
+ }
+ if(form.id==="profile-form"){
+  if(state.mode==="live"&&!state.user?.id)return toast("Sign in to edit your profile.");
+  const full_name=String(f.get("full_name")||"").trim();
+  const headline=String(f.get("headline")||"").trim();
+  const bio=String(f.get("bio")||"").trim();
+  const avatar_color=String(f.get("avatar_color")||"slate");
+  const subgroup=String(f.get("subgroup")||"");
+  if(!full_name||full_name.length>80||headline.length>80||bio.length>300||
+    !avatarColors.includes(avatar_color)||!groups.includes(subgroup)){
+    return toast("Please check your profile fields.");
+  }
+  const fields={full_name,headline,bio,avatar_color};
+  if(state.mode==="demo"){
+   state.data.profile=fields;
+   save(state.team,state.data);
+   render();
+  }else{
+   await saveLiveProfile(state.user.id,fields);
+   if(subgroup!==state.member?.subgroup)await updateOwnSubgroup(state.team,state.user.id,subgroup);
+   await refresh(true);
+  }
+  toast("Profile saved.");return;
  }
  if(form.id==="project-form"){
   if(!canEdit())return toast("Only team leads can edit projects.");
@@ -495,19 +528,31 @@ app.addEventListener("submit",async ev=>{
   toast(editing?"Project updated.":"Project created.");return;
  }
  if(form.id==="event-form"){
-  if(!canEdit())return toast("Only team leads can schedule events.");
-  const title=String(f.get("title")||"").trim().slice(0,140);
+  if(!canEdit())return toast("Only team leads and above can manage events.");
+  const title=String(f.get("title")||"").trim();
   const raw=String(f.get("start")||"");
   const starts=new Date(raw);
-  if(!title||!raw||Number.isNaN(starts.getTime()))return toast("Check the event date and title.");
+  if(!title||title.length>140||!raw||Number.isNaN(starts.getTime()))return toast("Check the event date and title.");
+  const editing=state.modal==="event-edit";
   if(state.mode==="demo"){
-   state.data.events.push({id:"demo-event-"+Date.now(),title,starts_at:starts.toISOString(),day:String(starts.getDate()).padStart(2,"0"),month:starts.toLocaleString("en-US",{month:"short"}).toUpperCase(),details:starts.toLocaleString("en-US",{dateStyle:"medium",timeStyle:"short"}),type:"Team"});
-   state.data.events.sort((a,b)=>new Date(a.starts_at||0)-new Date(b.starts_at||0));
+   if(editing){
+    const event=state.data.events.find(x=>String(x.id)===String(state.editingEventId));
+    if(!event)return toast("Event not found.");
+    Object.assign(event,{title,starts_at:starts.toISOString(),
+     day:String(starts.getDate()).padStart(2,"0"),
+     month:starts.toLocaleString("en-US",{month:"short"}).toUpperCase(),
+     details:starts.toLocaleString("en-US",{dateStyle:"medium",timeStyle:"short"}),edited_at:new Date().toISOString(),edited_by:"You (preview)"});
+   }else state.data.events.push({id:"demo-event-"+Date.now(),title,starts_at:starts.toISOString(),
+     day:String(starts.getDate()).padStart(2,"0"),
+     month:starts.toLocaleString("en-US",{month:"short"}).toUpperCase(),
+     details:starts.toLocaleString("en-US",{dateStyle:"medium",timeStyle:"short"}),type:"Team"});
+   state.data.events.sort((a,b)=>new Date(a.starts_at)-new Date(b.starts_at));
    save(state.team,state.data);
-  }else await addLiveEvent(state.team,title,starts.toISOString(),state.user.id);
-  state.modal=null;state.view="calendar";
+  }else if(editing)await editLiveEvent(state.team,state.editingEventId,title,starts.toISOString());
+  else await addLiveEvent(state.team,title,starts.toISOString(),state.user.id);
+  state.editingEventId=null;state.modal=null;state.view="calendar";
   if(state.mode==="live")await refresh(true);else render();
-  toast("Event scheduled.");return;
+  toast(editing?"Event updated.":"Event scheduled.");return;
  }
  if(form.id==="announcement-form"){
   if(!canEdit())return toast("Only team leads can publish announcements.");
@@ -544,12 +589,20 @@ app.addEventListener("submit",async ev=>{
   state.editingTaskId=null;state.modal=null;state.view="tasks";
 
  }else if(form.id==="log-form"){
-  if(!canEdit())return toast("Only team leads can add log entries.");
-  const title=String(f.get("title")||"").trim().slice(0,140),body=String(f.get("body")||"").trim().slice(0,3000),subgroup=String(f.get("subgroup")||"");
-  if(!title||!body||!groups.includes(subgroup))return;
-  if(state.mode==="demo"){state.data.logs.unshift({id:"l"+Date.now(),title,body,subgroup,author:"You (preview)",time:new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})});save(state.team,state.data);}
-  else await addLiveLog(state.team,title,body,subgroup,state.user.id);
-  state.modal=null;state.view="logs";
+   if(!canEdit())return toast("Only team leads and above can manage build logs.");
+   const title=String(f.get("title")||"").trim(),body=String(f.get("body")||"").trim(),subgroup=String(f.get("subgroup")||"");
+   if(!title||title.length>140||!body||body.length>3000||!groups.includes(subgroup))return toast("Check the log fields.");
+   const editing=state.modal==="log-edit";
+   if(state.mode==="demo"){
+    if(editing){
+     const record=state.data.logs.find(x=>String(x.id)===String(state.editingLogId));
+     if(!record)return toast("Build log entry not found.");
+     Object.assign(record,{title,body,subgroup,edited_at:new Date().toISOString(),edited_by:"You (preview)"});
+    }else state.data.logs.unshift({id:"l"+Date.now(),title,body,subgroup,author:"You (preview)",time:new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})});
+    save(state.team,state.data);
+   }else if(editing)await editLiveLog(state.team,state.editingLogId,{title,body,subgroup});
+   else await addLiveLog(state.team,title,body,subgroup,state.user.id);
+   state.editingLogId=null;state.modal=null;state.view="logs";
  }else{
   const text=String(f.get("body")||"").trim().slice(0,1000);if(!text)return;
   if(state.mode==="demo"){(state.data.messages[state.channel]||=([])).push({author:"You (preview)",initials:"YP",time:new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),text});save(state.team,state.data);}
