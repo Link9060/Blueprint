@@ -657,7 +657,7 @@ app.addEventListener("change",async ev=>{
  }catch(err){toast("Role update failed: "+(err.message||"Unknown error"));await refresh(true);}
 });
 app.addEventListener("submit",async ev=>{
- const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form","profile-form"].includes(form.id))return;
+ const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form","profile-form","report-form","reference-form","part-form"].includes(form.id))return;
  ev.preventDefault();if(previewReadOnly())return toast("Role preview is read-only. Exit preview to save changes.");const f=new FormData(form);
  try{
  if(form.id==="magic-link-form"){
@@ -670,6 +670,55 @@ app.addEventListener("submit",async ev=>{
   const name=String(f.get("name")||"").trim().slice(0,80),subgroup=String(f.get("subgroup")||"");
   if(!name||!groups.includes(subgroup))return toast("Enter a valid name and subgroup.");
   await requestMembership(state.team,state.user,name,subgroup);await refresh();toast("Access request submitted.");return;
+ }
+ if(form.id==="report-form"){
+  const reason=String(f.get("reason")||""),note=String(f.get("note")||"").trim(),id=state.reportMessageId;
+  if(!reportReasons.includes(reason)||note.length>500||!id)return toast("Check report details.");
+  const msg=Object.values(state.data.messages).flat().find(x=>x.id===id&&!x.hidden);
+  if(!msg)return toast("That message is no longer available.");
+  if(state.mode==="demo"){
+   if(state.data.reports.some(r=>r.message_id===id&&r.reporter_id==="preview-user"))return toast("You already reported this message.");
+   state.data.reports.unshift({id:"demo-report-"+Date.now(),message_id:id,reason,note,status:"open",reporter_id:"preview-user",created_at:new Date().toISOString()});
+   state.data.activity.unshift({id:"demo-audit-"+Date.now(),action:"message_reported",subject_type:"message_reports",subject_id:id,actor:"You (preview)",created_at:new Date().toISOString()});
+   save(state.team,state.data);
+  }else await reportTeamMessage(state.team,id,reason,note,state.user.id);
+  state.reportMessageId=null;state.modal=null;
+  if(state.mode==="live")await refresh(true);else render();
+  toast("Your report was sent privately to team administrators.");return;
+ }
+ if(form.id==="reference-form"){
+  if(!canEdit())return toast("Only a Lead or above can attach engineering references.");
+  const title=String(f.get("title")||"").trim(),raw=String(f.get("url")||"").trim(),kind=String(f.get("kind")||"");
+  const url=safeReferenceUrl(raw),projectId=state.linkProjectId;
+  if(!title||title.length>120||!url||!engineeringKinds.includes(kind)||
+     !state.data.projects.some(p=>String(p.id)===String(projectId)))return toast("Enter a title, valid HTTPS link, and project.");
+  if(state.mode==="demo"){
+   state.data.projectLinks.push({id:"demo-link-"+Date.now(),project_id:projectId,title,url,kind,created_at:new Date().toISOString()});
+   state.data.activity.unshift({id:"demo-audit-"+Date.now(),action:"reference_added",subject_type:"project_links",subject_id:projectId,actor:"You (preview)",created_at:new Date().toISOString()});
+   save(state.team,state.data);
+  }else await createEngineeringLink(state.team,projectId,title,url,kind,state.user.id);
+  state.linkProjectId=null;state.modal=null;state.view="projects";
+  if(state.mode==="live")await refresh(true);else render();
+  toast("Engineering reference attached.");return;
+ }
+ if(form.id==="part-form"){
+  const part_name=String(f.get("part_name")||"").trim(),notes=String(f.get("notes")||"").trim();
+  const quantity=Number(f.get("quantity")),method=String(f.get("method")||"");
+  const project_id=String(f.get("project_id")||"")||null;
+  if(!part_name||part_name.length>120||notes.length>1000||!Number.isInteger(quantity)||
+    quantity<1||quantity>999||!fabricationMethods.includes(method)||
+    (project_id&&!state.data.projects.some(p=>String(p.id)===project_id))){
+    return toast("Check the part details and quantity.");
+  }
+  if(state.mode==="demo"){
+   const id="demo-part-"+Date.now();
+   state.data.partRequests.unshift({id,part_name,notes,quantity,method,project_id,status:"requested",requested_by:"preview-user",created_at:new Date().toISOString()});
+   state.data.activity.unshift({id:"demo-audit-"+Date.now(),action:"part_requested",subject_type:"part_requests",subject_id:id,actor:"You (preview)",created_at:new Date().toISOString()});
+   save(state.team,state.data);
+  }else await requestPart(state.team,{part_name,notes,quantity,method,project_id},state.user.id);
+  state.modal=null;state.view="manufacturing";
+  if(state.mode==="live")await refresh(true);else render();
+  toast("Part request submitted.");return;
  }
  if(form.id==="profile-form"){
   if(state.mode==="live"&&!state.user?.id)return toast("Sign in to edit your profile.");
