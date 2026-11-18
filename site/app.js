@@ -797,7 +797,7 @@ app.addEventListener("change",async ev=>{
  }catch(err){toast("Role update failed: "+(err.message||"Unknown error"));await refresh(true);}
 });
 app.addEventListener("submit",async ev=>{
- const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form","profile-form","report-form","reference-form","part-form"].includes(form.id))return;
+ const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form","profile-form","report-form","reference-form","part-form","stock-form","bom-form","milestone-form"].includes(form.id))return;
  ev.preventDefault();if(previewReadOnly())return toast("Role preview is read-only. Exit preview to save changes.");const f=new FormData(form);
  try{
  if(form.id==="magic-link-form"){
@@ -810,6 +810,83 @@ app.addEventListener("submit",async ev=>{
   const name=String(f.get("name")||"").trim().slice(0,80),subgroup=String(f.get("subgroup")||"");
   if(!name||!groups.includes(subgroup))return toast("Enter a valid name and subgroup.");
   await requestMembership(state.team,state.user,name,subgroup);await refresh();toast("Access request submitted.");return;
+ }
+ if(form.id==="stock-form"){
+  if(!canEdit())return toast("Only team Leads and above can change inventory.");
+  const name=String(f.get("name")||"").trim(),sku=String(f.get("sku")||"").trim();
+  const storage_location=String(f.get("storage_location")||"").trim(),notes=String(f.get("notes")||"").trim();
+  const quantity_on_hand=validQuantity(f.get("quantity_on_hand"));
+  const reorder_at=validQuantity(f.get("reorder_at"));
+  const unit=String(f.get("unit")||"each");
+  if(!name||name.length>120||sku.length>80||storage_location.length>120||
+     notes.length>1000||quantity_on_hand===null||reorder_at===null||!inventoryUnits.includes(unit)){
+    return toast("Check the inventory fields and quantities.");
+  }
+  const fields={name,sku,storage_location,notes,quantity_on_hand,reorder_at,unit};
+  const editing=state.modal==="stock-edit";
+  if(state.mode==="demo"){
+   if(editing){
+    const item=state.data.inventory.find(x=>String(x.id)===String(state.editingStockId));
+    if(!item)return toast("Stock item not found.");
+    Object.assign(item,fields);
+   }else state.data.inventory.unshift({id:"demo-stock-"+Date.now(),...fields,created_at:new Date().toISOString()});
+   save(state.team,state.data);
+  }else if(editing)await updateInventoryItem(state.team,state.editingStockId,fields);
+  else await createInventoryItem(state.team,fields,state.user.id);
+  state.editingStockId=null;state.modal=null;state.view="inventory";
+  if(state.mode==="live")await refresh(true);else render();
+  toast(editing?"Stock updated.":"Inventory item created.");return;
+ }
+ if(form.id==="bom-form"){
+  if(!canEdit())return toast("Only team Leads and above can manage BOMs.");
+  const projectId=state.planningProjectId,editing=state.modal==="bom-edit";
+  const inventoryId=String(f.get("inventory_id")||"");
+  const quantity_required=validQuantity(f.get("quantity_required"),1);
+  const notes=String(f.get("notes")||"").trim();
+  if(!state.data.projects.some(p=>p.id===projectId)||
+    !state.data.inventory.some(x=>x.id===inventoryId)||
+    quantity_required===null||notes.length>500)return toast("Check the BOM inventory item and quantity.");
+  if(!editing&&state.data.bom.some(b=>b.project_id===projectId&&b.inventory_id===inventoryId)){
+   return toast("This project already has that stock item. Edit the existing BOM line instead.");
+  }
+  if(state.mode==="demo"){
+   if(editing){
+    const line=state.data.bom.find(x=>String(x.id)===String(state.editingBomId));
+    if(!line)return toast("BOM line not found.");
+    Object.assign(line,{quantity_required,notes});
+   }else state.data.bom.push({id:"demo-bom-"+Date.now(),project_id:projectId,inventory_id:inventoryId,quantity_required,notes});
+   save(state.team,state.data);
+  }else if(editing)await updateBomLine(state.team,state.editingBomId,quantity_required,notes);
+  else await createBomLine(state.team,projectId,inventoryId,quantity_required,notes,state.user.id);
+  state.planningProjectId=null;state.editingBomId=null;state.modal=null;state.view="projects";
+  if(state.mode==="live")await refresh(true);else render();
+  toast(editing?"BOM requirement updated.":"Part added to BOM.");return;
+ }
+ if(form.id==="milestone-form"){
+  if(!canEdit())return toast("Only team Leads and above can manage milestones.");
+  const projectId=state.planningProjectId,editing=state.modal==="milestone-edit";
+  const title=String(f.get("title")||"").trim();
+  const status=String(f.get("status")||"planned");
+  const due_on=String(f.get("due_on")||"").trim()||null;
+  const notes=String(f.get("notes")||"").trim();
+  if(!state.data.projects.some(p=>p.id===projectId)||!title||title.length>140||
+    !milestoneStatuses.includes(status)||notes.length>800||
+    (due_on&&(!/^\d{4}-\d{2}-\d{2}$/.test(due_on)||Number.isNaN(new Date(due_on+"T00:00:00").getTime())))){
+   return toast("Check the milestone details.");
+  }
+  const fields={title,status,due_on,notes};
+  if(state.mode==="demo"){
+   if(editing){
+    const milestone=state.data.milestones.find(x=>String(x.id)===String(state.editingMilestoneId));
+    if(!milestone)return toast("Milestone not found.");
+    Object.assign(milestone,fields);
+   }else state.data.milestones.push({id:"demo-milestone-"+Date.now(),project_id:projectId,...fields});
+   save(state.team,state.data);
+  }else if(editing)await updateProjectMilestone(state.team,state.editingMilestoneId,fields);
+  else await createProjectMilestone(state.team,{project_id:projectId,...fields},state.user.id);
+  state.planningProjectId=null;state.editingMilestoneId=null;state.modal=null;state.view="projects";
+  if(state.mode==="live")await refresh(true);else render();
+  toast(editing?"Milestone updated.":"Milestone created.");return;
  }
  if(form.id==="report-form"){
   const reason=String(f.get("reason")||""),note=String(f.get("note")||"").trim(),id=state.reportMessageId;
