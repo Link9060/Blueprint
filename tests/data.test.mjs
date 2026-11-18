@@ -67,3 +67,11 @@ test("production adapter never includes a secret key",()=>{
  assert.ok(source.includes("supabasePublishableKey"));
  assert.ok(!source.includes("service_role"));
 });
+
+test("upgrade adds private announcements and RLS-protected realtime feeds",()=>{
+ const sql=readFileSync(new URL("../database/upgrade_v2.sql",import.meta.url),"utf8");
+ assert.match(sql,/alter table public\.announcements enable row level security/);
+ assert.match(sql,/create policy "Approved members read announcements"/);
+ assert.match(sql,/create policy "Leads create announcements"/);
+ assert.match(sql,/alter publication supabase_realtime add table public\.messages/);
+});

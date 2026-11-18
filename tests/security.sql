@@ -104,3 +104,27 @@ end $$;
 
 reset role;
 select 'Blueprint RLS checks passed' as result;
+
+-- Announcement and project permission checks in a simulated multi-account environment.
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000003',false);
+do $$
+declare blocked boolean := false;
+begin
+ if (select count(*) from public.announcements)<>0 then raise exception 'Unexpected announcement fixtures'; end if;
+ begin
+  insert into public.announcements(team_id,title,body,author_id)
+   values('1810','Unapproved post','Not allowed','00000000-0000-4000-8000-000000000003');
+ exception when others then blocked := true;
+ end;
+ if not blocked then raise exception 'Non-lead posted an announcement'; end if;
+end $$;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000001',false);
+insert into public.announcements(team_id,title,body,author_id)
+ values('1810','Test announcement','This is a fixture.','00000000-0000-4000-8000-000000000001');
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000004',false);
+do $$
+begin
+ if (select count(*) from public.announcements)<>0 then raise exception 'Other team saw announcement'; end if;
+end $$;
+reset role;

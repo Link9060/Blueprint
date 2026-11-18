@@ -10,3 +10,6 @@ as $$
 $$;
 grant usage on schema auth to authenticated;
 grant execute on function auth.uid() to authenticated;
+
+-- Supabase provides this publication in production.
+create publication supabase_realtime;

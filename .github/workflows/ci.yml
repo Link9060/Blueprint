@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - "build/**"
+      - "feature/**"
+      - main
   pull_request:
     branches: [main]
 permissions:
@@ -17,8 +19,9 @@ jobs:
           node --check site/app.js
           node --check site/data.js
           node --check site/supabase.js
+          node --check site/config.js
       - name: Run unit and schema tests
-        run: node --test tests/data.test.mjs
+        run: node --test tests/data.test.mjs tests/render.test.mjs
   database:
     runs-on: ubuntu-latest
     services:
@@ -46,5 +49,7 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f tests/bootstrap.sql
       - name: Apply Blueprint schema
         run: psql -v ON_ERROR_STOP=1 -f database/schema.sql
+      - name: Apply Blueprint v2 extensions
+        run: psql -v ON_ERROR_STOP=1 -f database/upgrade_v2.sql
       - name: Verify team isolation and permissions
         run: psql -v ON_ERROR_STOP=1 -f tests/security.sql
