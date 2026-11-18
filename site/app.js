@@ -437,6 +437,52 @@ function modal(){
  }else if(state.modal==="announcement"){
   title="Publish an announcement";description="This update will be visible to every approved member of this team.";
   body='<form id="announcement-form"><div class="form-group"><label for="announce-title">Title</label><input id="announce-title" name="title" class="field" maxlength="140" required placeholder="Short, clear headline"></div><div class="form-group"><label for="announce-body">Message</label><textarea id="announce-body" name="body" class="field" maxlength="2000" required placeholder="What does everyone need to know?"></textarea></div><div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Publish announcement</button></div></form>';
+ }else if(state.modal==="dependency"){
+  const task=state.data.tasks.find(x=>String(x.id)===String(state.dependencyTaskId));
+  if(!task)return "";
+  title="Manage task prerequisites";
+  description="This task cannot be finished until its prerequisite tasks are completed. Circular links are rejected.";
+  const current=taskPrerequisites(task.id,state.data.taskDependencies||[],state.data.tasks);
+  const currentHtml=current.map(x=>
+   '<div class="prerequisite-row"><div><b>'+e(x.title)+'</b><small>'+e(statusName(x.status))+'</small></div>'+
+   '<button type="button" class="subtle-action" data-remove-dependency="'+e(x.id)+'">Remove</button></div>'
+  ).join("")||'<p class="hint">No prerequisites currently linked.</p>';
+  const options=state.data.tasks.filter(x=>x.id!==task.id&&!current.some(y=>y.id===x.id)&&
+   !wouldCreateCycle(task.id,x.id,state.data.taskDependencies||[])).map(x=>
+   '<option value="'+e(x.id)+'">'+e(x.title)+' · '+e(statusName(x.status))+'</option>'
+  ).join("");
+  body='<div class="dependency-existing"><h3>Current prerequisites</h3>'+currentHtml+'</div>'+
+   (options?'<form id="dependency-form"><div class="form-group"><label for="dependency-select">Add prerequisite task</label>'+
+    '<select id="dependency-select" class="field" name="prerequisite_id" required><option value="">Select a task</option>'+options+'</select></div>'+
+    '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Close</button>'+
+    '<button class="btn primary" type="submit">Add prerequisite</button></div></form>':
+    '<p class="hint">No other tasks are available to link. Close this dialog to return to the task board.</p>'+
+    '<div class="form-buttons"><button class="btn" type="button" data-action="close-modal">Close</button></div>');
+ }else if(state.modal==="checklist"||state.modal==="checklist-edit"){
+  const editing=state.modal==="checklist-edit";
+  const item=editing?state.data.eventChecklist.find(x=>String(x.id)===String(state.editingChecklistId)):null;
+  if(editing&&!item)return "";
+  const ev=state.data.events.find(x=>String(x.id)===String(state.checklistEventId));
+  if(!ev)return "";
+  title=editing?"Edit preparation item":"Add event preparation item";
+  description="Plan packing, pit setup, inspection and team preparation for "+ev.title+".";
+  const peopleOptions='<option value="">Unassigned</option>'+state.data.people.map(p=>
+   '<option value="'+e(p.id)+'" '+(item?.assigned_to===p.id?"selected":"")+'>'+e(p.name)+'</option>'
+  ).join("");
+  body='<form id="checklist-form"><div class="form-group"><label for="checklist-title">Item</label>'+
+   '<input id="checklist-title" name="title" class="field" maxlength="140" required value="'+e(item?.title||"")+'" placeholder="e.g. Check spare electronics case"></div>'+
+   '<div class="form-duo"><div class="form-group"><label for="checklist-category">Category</label>'+
+   '<select id="checklist-category" name="category" class="field">'+preparationCategories.map(k=>
+    '<option value="'+k+'" '+((item?.category||"packing")===k?"selected":"")+'>'+e(preparationLabels[k])+'</option>').join("")+'</select></div>'+
+   '<div class="form-group"><label for="checklist-assignee">Assign to</label>'+
+   '<select id="checklist-assignee" class="field" name="assigned_to">'+peopleOptions+'</select></div></div>'+
+   (editing?'<div class="form-group"><label for="checklist-status">Status</label>'+
+    '<select id="checklist-status" name="status" class="field"><option value="todo" '+(item.status==="todo"?"selected":"")+'>To do</option>'+
+    '<option value="done" '+(item.status==="done"?"selected":"")+'>Done</option></select></div>':"")+
+   '<div class="form-group"><label for="checklist-notes">Notes</label>'+
+   '<textarea id="checklist-notes" class="field" name="notes" maxlength="800" placeholder="Equipment details, check requirements or preparation notes">'+e(item?.notes||"")+'</textarea></div>'+
+   '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button>'+
+   '<button type="submit" class="btn primary">'+(editing?"Save changes":"Add checklist item")+'</button></div></form>';
  }else if(state.modal==="report"){
   if(!state.reportMessageId)return "";
   title="Report a team message";
