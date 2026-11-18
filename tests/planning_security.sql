@@ -83,8 +83,18 @@ begin
  end if;
 end $$;
 
--- Pending teammates get no access to catalog or milestone contents.
-select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000005',false);
+-- Another fixture was approved by earlier security tests, so create an
+-- independently pending applicant for this v6 permission check.
+reset role;
+select set_config('request.jwt.claim.sub','',false);
+insert into auth.users(id) values ('00000000-0000-4000-8000-000000000007');
+insert into public.profiles(id,full_name) values
+ ('00000000-0000-4000-8000-000000000007','Pending Inventory User');
+insert into public.team_memberships(team_id,user_id,role,subgroup,status) values
+ ('1810','00000000-0000-4000-8000-000000000007','member','Design','pending');
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000007',false);
+
 do $$
 begin
  if (select count(*) from public.inventory_items)<>0 or
