@@ -111,3 +111,51 @@
 .profile-form-footer .btn{flex:none}
 @media(max-width:800px){.profile-swatches{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:560px){.profile-hero{padding:21px;gap:15px}.avatar-large{width:62px;height:62px;font-size:22px;border-radius:16px}.profile-hero h2{font-size:20px}.profile-form-footer{flex-direction:column;align-items:stretch}.profile-form-footer .btn{width:100%}}
+
+
+/* Blueprint v5 engineering and team-safety workspace */
+.project-references{margin-top:15px;padding-top:14px;border-top:1px solid #e2e9eb;display:flex;flex-direction:column;gap:9px}
+.reference-heading{font-size:9px;letter-spacing:1.1px;font-weight:800;color:#85969e}
+.reference-line{display:flex;align-items:center;flex-wrap:wrap;gap:9px;min-width:0}
+.reference-line a{color:#396982;text-decoration:underline;text-underline-offset:3px;font-size:11px;font-weight:650;overflow-wrap:anywhere;min-width:0}
+.reference-line a:hover{text-decoration-thickness:2px}
+.reference-line small{font-size:9px;color:#8a9a9f}
+.project-edit-actions{margin-top:13px}
+.project-references>.btn{align-self:flex-start}
+.muted{color:#8f9fa5}
+.subtle-action{display:inline-flex;align-items:center;border:0;background:none;padding:4px 2px;color:#607a89;font-size:10px;font-weight:650;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.subtle-action:hover{color:#21485d}
+.subtle-action:focus-visible{outline:2px solid #608dab;outline-offset:3px;border-radius:3px}
+.message-content{flex:1;min-width:0}
+.message-header{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.message-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}
+.message-muted{background:#f7f8f8;border-left:3px solid #a3adb3;padding-left:12px}
+.message-muted .message-content>p{color:#74848b}
+.moderation-label{font-size:10px;color:#80665a;font-weight:600}
+.manufacture-board{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.manufacture-item{padding:23px;min-width:0}
+.manufacture-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.manufacture-head h3{font-size:17px;letter-spacing:-.4px;margin:9px 0 0;overflow-wrap:anywhere}
+.manufacture-item p{font-size:12px;line-height:1.7;color:#627881;white-space:pre-wrap;overflow-wrap:anywhere}
+.manufacture-item>small{font-size:11px;color:#758992}
+.manufacture-update{border-top:1px solid #e4ebef;margin-top:16px;padding-top:12px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+.manufacture-update label{font-size:11px;font-weight:700}
+.manufacture-update select{width:auto;min-width:160px}
+.dashboard-spacer{height:18px}
+.safety-item{padding:20px;margin-top:12px}
+.safety-item:first-child{margin-top:0}
+.report-header{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.safety-item h3{font-size:15px;letter-spacing:-.2px;margin:10px 0 5px}
+.safety-item>p{font-size:12px;color:#6f8088;white-space:pre-wrap;line-height:1.65;overflow-wrap:anywhere;margin:5px 0}
+.safety-item>small{color:#84939a;font-size:10px}
+.reported-excerpt{margin-top:14px;background:#f6f8f9;border:1px solid #e2e8eb;border-radius:9px;padding:12px 14px}
+.reported-excerpt b{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:#6c838c}
+.reported-excerpt p{font-size:12px;margin:8px 0 0;line-height:1.7;overflow-wrap:anywhere}
+.report-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:15px}
+.activity-row{border-bottom:1px solid #e9eff1;padding:11px 0;display:flex;gap:12px;justify-content:space-between;align-items:center}
+.activity-row:last-child{border-bottom:0}
+.activity-row b{text-transform:capitalize;font-size:12px}
+.activity-row small{font-size:10px;color:#82949c;display:block;margin-top:3px}
+@media(max-width:950px){.manufacture-board{grid-template-columns:1fr}}
+@media(max-width:650px){.manufacture-item{padding:18px}.manufacture-update{align-items:stretch;flex-direction:column}.manufacture-update select{width:100%}.report-actions{flex-direction:column}.report-actions .btn{width:100%}.activity-row{align-items:flex-start;flex-direction:column}}
+@media(prefers-reduced-motion:reduce){.subtle-action,.reference-line a{transition:none}}
