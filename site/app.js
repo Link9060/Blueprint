@@ -1,9 +1,10 @@
 import {teams,groups,channels,workspace,save,reset,progress} from "./data.js";
 import {roleLabels,rolePreviewOptions,canManageTeam,canManageWork,roleIsPreviewable} from "./roles.js";
-import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,addLiveAnnouncement,subscribeTeam} from "./supabase.js";
+import {avatarColors,avatarColorNames,avatarClass,localDateTime} from "./profile.js";
+import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,editLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,editLiveEvent,addLiveAnnouncement,getLiveProfile,saveLiveProfile,updateOwnSubgroup,subscribeTeam} from "./supabase.js";
 
 const app=document.getElementById("app");
-const state={team:sessionStorage.getItem("blueprint-selected-team")||null,view:"overview",filter:"all",channel:"general",modal:null,menu:false,editingTaskId:null,editingProjectId:null,authNotice:"",unsubscribe:null,subscriptionTeam:null,refreshBusy:false,realtimeTimer:null,taskScope:"all",rolePreview:null,mode:configured()?"live":"demo",user:null,member:null,data:null,loading:false,error:""};
+const state={team:sessionStorage.getItem("blueprint-selected-team")||null,view:"overview",filter:"all",channel:"general",modal:null,menu:false,editingTaskId:null,editingProjectId:null,editingLogId:null,editingEventId:null,profile:null,authNotice:"",unsubscribe:null,subscriptionTeam:null,refreshBusy:false,realtimeTimer:null,taskScope:"all",rolePreview:null,mode:configured()?"live":"demo",user:null,member:null,data:null,loading:false,error:""};
 const glyphs={
  overview:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
  tasks:'<path d="M9 5h12M9 12h12M9 19h12"/><path d="m3 5 1.3 1.3L6.5 4M3 12l1.3 1.3L6.5 11M3 19l1.3 1.3L6.5 18"/>',
@@ -33,6 +34,8 @@ function button(text,action,kind=""){
 }
 function currentTeam(){return teams.find(t=>t.id===state.team)||teams[0];}
 function initials(name){return String(name||"").split(/\s+/).map(x=>x[0]||"").join("").slice(0,2).toUpperCase();}
+function currentProfile(){return state.mode==="demo"?(state.data?.profile||{}):(state.profile||{});}
+function avatarHtml(name,color,extra=""){return '<span class="avatar '+avatarClass(color)+' '+extra+'">'+e(initials(name)||"BP")+'</span>';}
 function statusName(status){return ({done:"Complete",in_progress:"In progress",todo:"To do",blocked:"Blocked"})[status]||"To do";}
 function pill(status){return '<span class="pill '+(status==="done"?"complete":status==="in_progress"?"active":status==="blocked"?"blocked":"")+'">'+statusName(status)+'</span>';}
 function notice(message){return '<div class="notice">'+icon("info",15)+'<span>'+message+'</span></div>';}
@@ -116,7 +119,12 @@ function renderTasks(){
  return heading("PROJECT COORDINATION","Tasks & assignments","Clear ownership, useful deadlines, fewer missed handoffs.",allowed?button(icon("plus",15)+" New task","new-task","primary"):"")+sampleNote()+'<div class="task-toolbar">'+scope+'<div class="filter-row">'+statusFilters.map(x=>'<button class="filter '+(state.filter===x[0]?"active":"")+'" data-filter="'+x[0]+'">'+x[1]+'</button>').join("")+'</div></div><div>'+tasks.map(t=>'<div class="card entry"><button data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" class="task-check '+(t.status==="done"?"done":"")+'" '+(canToggle(t)?"":"disabled")+'></button><div class="entry-main"><b>'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(assignee(t))+' · Due '+e(t.due)+' · '+e(t.priority)+' priority</small></div>'+pill(t.status)+(allowed?'<div class="entry-actions"><button type="button" class="btn small" data-edit-task="'+e(t.id)+'">'+icon("pencil",13)+' Edit</button></div>':"")+'</div>').join("")+'</div>'+(tasks.length?"":'<div class="empty">No tasks match this view.</div>');
 }
 function renderLogs(){
- const entries=state.data.logs.map(l=>'<article class="log"><h3>'+e(l.title)+'</h3><p>'+e(l.body)+'</p><small>'+e(l.subgroup)+' · '+e(l.author)+' · '+e(l.time)+'</small></article>').join("");
+ const entries=state.data.logs.map(l=>
+  '<article class="log"><div class="record-title"><h3>'+e(l.title)+'</h3>'+
+  (canEdit()?'<button type="button" class="btn small record-edit" data-edit-log="'+e(l.id)+'">'+icon("pencil",13)+' Edit</button>':"")+
+  '</div><p>'+e(l.body)+'</p><small>'+e(l.subgroup)+' · '+e(l.author)+' · '+e(l.time)+
+  (l.edited_at?' · Edited by '+e(l.edited_by||"Team lead"):"")+'</small></article>'
+ ).join("");
  return heading("ENGINEERING HISTORY","Build log","Keep a reliable record of what changed, why it changed, and what comes next.",canEdit()?button(icon("plus",15)+" Add entry","new-log","primary"):"")+sampleNote()+section("Recent changes","",'<div class="timeline">'+(entries||'<div class="empty">No updates yet.</div>')+'</div>');
 }
 function renderProjects(){
@@ -125,11 +133,23 @@ function renderProjects(){
 }
 
 function renderPeople(){
- const cards=state.data.people.map(p=>'<article class="card person"><div class="avatar">'+e(p.initials||initials(p.name))+'</div><div><h3>'+e(p.name)+'</h3><small>'+e(p.role)+' · '+e(p.group)+'</small></div></article>').join("");
+ const cards=state.data.people.map(p=>
+  '<article class="card person">'+avatarHtml(p.name,p.avatar_color)+
+  '<div class="person-details"><h3>'+e(p.name)+'</h3><small>'+e(roleLabels[p.role]||p.role)+' · '+e(p.group)+'</small>'+
+  (p.headline?'<p class="person-headline">'+e(p.headline)+'</p>':"")+
+  (p.bio?'<p class="person-bio">'+e(p.bio)+'</p>':"")+'</div></article>'
+ ).join("");
  return heading("PEOPLE & ROLES","Team directory","Find the right person or subgroup for the next step.")+sampleNote()+'<div class="people">'+(cards||'<div class="empty">The directory will populate when members join.</div>')+'</div>';
 }
 function renderCalendar(){
- const cards=state.data.events.map(ev=>'<div class="card event"><div class="event-date"><b>'+e(ev.day)+'</b><small>'+e(ev.month)+'</small></div><div class="event-info"><b>'+e(ev.title)+'</b><small>'+e(ev.details)+'</small></div><span class="pill">'+e(ev.type)+'</span></div>').join("");
+ const cards=state.data.events.map(ev=>
+  '<div class="card event"><div class="event-date"><b>'+e(ev.day)+'</b><small>'+e(ev.month)+'</small></div>'+
+  '<div class="event-info"><b>'+e(ev.title)+'</b><small>'+e(ev.details)+
+  (ev.edited_at?' · Updated by '+e(ev.edited_by||"Team lead"):"")+'</small></div>'+
+  '<span class="pill">'+e(ev.type)+'</span>'+
+  (canEdit()?'<button type="button" class="btn small record-edit" data-edit-event="'+e(ev.id)+'">'+icon("pencil",13)+' Edit</button>':"")+
+  '</div>'
+ ).join("");
  return heading("LOOKING AHEAD","Schedule","Build meetings, reviews, and important team milestones.",canEdit()?button(icon("plus",15)+" New event","new-event","primary"):"")+sampleNote()+'<div class="events">'+(cards||'<div class="empty">No events are scheduled yet.</div>')+'</div>';
 }
 function renderAnnouncements(){
