@@ -244,18 +244,36 @@ function modal(){
   const priority=["Low","Normal","High"].map(p=>'<option '+(p===(t?.priority||"Normal")?"selected":"")+'>'+p+'</option>').join("");
   const statusOptions=[["todo","To do"],["in_progress","In progress"],["blocked","Blocked"],["done","Complete"]].map(([value,name])=>'<option value="'+value+'" '+(value===(t?.status||"todo")?"selected":"")+'>'+name+'</option>').join("");
   body='<form id="'+(editing?"task-edit-form":"task-form")+'"><div class="form-group"><label for="task-title">Task title</label><input id="task-title" class="field" name="title" maxlength="140" required value="'+e(t?.title||"")+'" placeholder="e.g. Verify intake clearance"></div><div class="form-duo"><div class="form-group"><label for="task-group">Subgroup</label><select id="task-group" class="field" name="subgroup">'+selector+'</select></div><div class="form-group"><label for="task-priority">Priority</label><select id="task-priority" class="field" name="priority">'+priority+'</select></div></div><div class="form-duo"><div class="form-group"><label for="task-owner">Assign to</label><select id="task-owner" class="field" name="assigned_to">'+selectionOptions(t?.assigned_to)+'</select></div><div class="form-group"><label for="task-due">Due date</label><input id="task-due" type="date" class="field" name="due_date" value="'+e(t?.due_date||"")+'"></div></div>'+(editing?'<div class="form-group"><label for="task-status">Status</label><select id="task-status" class="field" name="status">'+statusOptions+'</select></div>':"")+'<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">'+(editing?"Save changes":"Create task")+'</button></div></form>';
- }else if(state.modal==="log"){
-  title="Add a build log entry";description="Log a real change, test or engineering decision.";
-  body='<form id="log-form"><div class="form-group"><label>What changed?</label><input class="field" name="title" maxlength="140" required placeholder="Short summary"></div><div class="form-group"><label>Details</label><textarea class="field" name="body" maxlength="3000" required placeholder="What was done, tested, or found?"></textarea></div><div class="form-group"><label>Subgroup</label><select class="field" name="subgroup">'+groups.map(x=>'<option>'+e(x)+'</option>').join("")+'</select></div><div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Add entry</button></div></form>';
+ }else if(state.modal==="log"||state.modal==="log-edit"){
+  const editing=state.modal==="log-edit";
+  const record=editing?state.data.logs.find(l=>String(l.id)===String(state.editingLogId)):null;
+  if(editing&&!record)return "";
+  title=editing?"Edit build log entry":"Add a build log entry";
+  description="Record the engineering change and its reasoning. The original author is preserved.";
+  body='<form id="log-form"><div class="form-group"><label for="log-title">What changed?</label>'+
+   '<input id="log-title" class="field" name="title" maxlength="140" required value="'+e(record?.title||"")+'" placeholder="Short summary"></div>'+
+   '<div class="form-group"><label for="log-body">Details</label><textarea id="log-body" class="field" name="body" maxlength="3000" required placeholder="What was done, tested, or found?">'+e(record?.body||"")+'</textarea></div>'+
+   '<div class="form-group"><label for="log-group">Subgroup</label><select id="log-group" class="field" name="subgroup">'+groups.map(g=>'<option '+(g===(record?.subgroup||"Design")?"selected":"")+'>'+e(g)+'</option>').join("")+'</select></div>'+
+   '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">'+(editing?"Save changes":"Add entry")+'</button></div></form>';
+
  }else if(state.modal==="project"||state.modal==="project-edit"){
   const editing=state.modal==="project-edit";
   const p=editing?state.data.projects.find(x=>String(x.id)===String(state.editingProjectId)):null;
   if(editing&&!p)return "";
   title=editing?"Edit project":"Create a project";description="Organize a robot subsystem, software effort or other workstream.";
   body='<form id="project-form"><div class="form-group"><label for="project-name">Project name</label><input id="project-name" name="name" class="field" maxlength="100" required value="'+e(p?.name||"")+'" placeholder="e.g. Drivetrain"></div><div class="form-group"><label for="project-desc">Description</label><textarea id="project-desc" name="description" class="field" maxlength="1500" placeholder="What is this group working on?">'+e(p?.description||"")+'</textarea></div><div class="form-duo"><div class="form-group"><label for="project-group">Lead subgroup</label><select id="project-group" name="subgroup" class="field">'+groups.map(g=>'<option '+(g===(p?.subgroup||"Design")?"selected":"")+'>'+e(g)+'</option>').join("")+'</select></div>'+(editing?'<div class="form-group"><label for="project-progress">Progress (%)</label><input id="project-progress" type="number" min="0" max="100" step="1" name="progress" class="field" value="'+e(p.progress||0)+'"></div>':"")+'</div><div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">'+(editing?"Save project":"Create project")+'</button></div></form>';
- }else if(state.modal==="event"){
-  title="Schedule an event";description="Place a team meeting or review on the shared calendar.";
-  body='<form id="event-form"><div class="form-group"><label for="event-title">Event title</label><input id="event-title" name="title" class="field" maxlength="140" required placeholder="e.g. CAD review"></div><div class="form-group"><label for="event-time">Date and time</label><input id="event-time" type="datetime-local" name="start" class="field" required></div><div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Schedule event</button></div></form>';
+ }else if(state.modal==="event"||state.modal==="event-edit"){
+  const editing=state.modal==="event-edit";
+  const record=editing?state.data.events.find(v=>String(v.id)===String(state.editingEventId)):null;
+  if(editing&&!record)return "";
+  title=editing?"Edit scheduled event":"Schedule an event";
+  description="Keep team meetings and reviews accurate for everyone.";
+  body='<form id="event-form"><div class="form-group"><label for="event-title">Event title</label>'+
+   '<input id="event-title" name="title" class="field" maxlength="140" required value="'+e(record?.title||"")+'" placeholder="e.g. CAD review"></div>'+
+   '<div class="form-group"><label for="event-time">Date and time</label>'+
+   '<input id="event-time" type="datetime-local" name="start" class="field" required value="'+e(localDateTime(record?.starts_at))+'"></div>'+
+   '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">'+(editing?"Save changes":"Schedule event")+'</button></div></form>';
+
  }else if(state.modal==="announcement"){
   title="Publish an announcement";description="This update will be visible to every approved member of this team.";
   body='<form id="announcement-form"><div class="form-group"><label for="announce-title">Title</label><input id="announce-title" name="title" class="field" maxlength="140" required placeholder="Short, clear headline"></div><div class="form-group"><label for="announce-body">Message</label><textarea id="announce-body" name="body" class="field" maxlength="2000" required placeholder="What does everyone need to know?"></textarea></div><div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Publish announcement</button></div></form>';
