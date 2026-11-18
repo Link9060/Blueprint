@@ -51,5 +51,7 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/schema.sql
       - name: Apply Blueprint v2 extensions
         run: psql -v ON_ERROR_STOP=1 -f database/upgrade_v2.sql
+      - name: Apply protected Owner hierarchy
+        run: psql -v ON_ERROR_STOP=1 -f database/upgrade_v3_owner.sql
       - name: Verify team isolation and permissions
         run: psql -v ON_ERROR_STOP=1 -f tests/security.sql

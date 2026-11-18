@@ -128,3 +128,35 @@ begin
  if (select count(*) from public.announcements)<>0 then raise exception 'Other team saw announcement'; end if;
 end $$;
 reset role;
+
+-- Owner bootstrap occurs only with trusted Postgres administrative access.
+reset role;
+update public.team_memberships set role='owner'
+ where team_id='1810' and user_id='00000000-0000-4000-8000-000000000001';
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000001',false);
+do $$
+declare n integer; denied boolean := false;
+begin
+ select count(*) into n from public.tasks;
+ if n<>1 then raise exception 'Owner unexpectedly bypasses team isolation'; end if;
+ update public.team_memberships set role='captain'
+ where team_id='1810' and user_id='00000000-0000-4000-8000-000000000002';
+ select count(*) into n from public.team_memberships
+ where team_id='1810' and user_id='00000000-0000-4000-8000-000000000002' and role='captain';
+ if n<>1 then raise exception 'Owner cannot manage regular team roles'; end if;
+ begin
+  update public.team_memberships set role='owner'
+  where team_id='1810' and user_id='00000000-0000-4000-8000-000000000002';
+ exception when others then denied:=true;
+ end;
+ if not denied then raise exception 'Owner role escalated via authenticated client'; end if;
+ denied:=false;
+ begin
+  update public.team_memberships set role='admin'
+  where team_id='1810' and user_id='00000000-0000-4000-8000-000000000001';
+ exception when others then denied:=true;
+ end;
+ if not denied then raise exception 'Owner account was demoted via authenticated client'; end if;
+end $$;
+reset role;
