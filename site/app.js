@@ -548,6 +548,64 @@ app.addEventListener("click",async ev=>{
   }catch(err){toast("Unable to update request: "+err.message);}
   return;
  }
+ const reportButton=ev.target.closest("[data-report-message]");
+ if(reportButton){
+  if(previewReadOnly())return toast("Exit role preview before reporting.");
+  state.reportMessageId=reportButton.dataset.reportMessage;
+  state.modal="report";render();return;
+ }
+ const addReference=ev.target.closest("[data-add-reference]");
+ if(addReference){
+  if(previewReadOnly()||!canEdit())return;
+  state.linkProjectId=addReference.dataset.addReference;
+  state.modal="reference";render();return;
+ }
+ const removeReference=ev.target.closest("[data-remove-reference]");
+ if(removeReference){
+  if(previewReadOnly()||!canEdit())return;
+  const id=removeReference.dataset.removeReference;
+  try{
+   if(state.mode==="demo"){
+    state.data.projectLinks=state.data.projectLinks.filter(x=>String(x.id)!==id);
+    state.data.activity.unshift({id:"demo-audit-"+Date.now(),action:"reference_removed",subject_type:"project_links",subject_id:id,actor:"You (preview)",created_at:new Date().toISOString()});
+    save(state.team,state.data);render();
+   }else{await deleteEngineeringLink(state.team,id);await refresh(true);}
+   toast("Reference removed.");
+  }catch(err){toast("Could not remove reference: "+err.message);}
+  return;
+ }
+ const moderate=ev.target.closest("[data-message-visibility]");
+ if(moderate){
+  if(previewReadOnly()||!canAdmin())return;
+  const id=moderate.dataset.messageVisibility,visible=moderate.dataset.visible==="yes";
+  try{
+   if(state.mode==="demo"){
+    const msg=Object.values(state.data.messages).flat().find(x=>x.id===id);
+    if(!msg)return;
+    msg.hidden=!visible;
+    state.data.activity.unshift({id:"demo-audit-"+Date.now(),action:visible?"message_restored":"message_hidden",subject_type:"messages",subject_id:id,actor:"You (preview)",created_at:new Date().toISOString()});
+    save(state.team,state.data);render();
+   }else{await setMessageVisibility(state.team,id,visible);await refresh(true);}
+   toast(visible?"Message restored.":"Message hidden from members.");
+  }catch(err){toast("Moderation update failed: "+err.message);}
+  return;
+ }
+ const review=ev.target.closest("[data-review-report]");
+ if(review){
+  if(previewReadOnly()||!canAdmin())return;
+  const id=review.dataset.reviewReport,status=review.dataset.reportStatus;
+  if(!["reviewed","dismissed"].includes(status))return;
+  try{
+   if(state.mode==="demo"){
+    const record=state.data.reports.find(x=>x.id===id);
+    if(record){record.status=status;record.reviewed_at=new Date().toISOString();}
+    state.data.activity.unshift({id:"demo-audit-"+Date.now(),action:status==="reviewed"?"report_reviewed":"report_dismissed",subject_type:"message_reports",subject_id:id,actor:"You (preview)",created_at:new Date().toISOString()});
+    save(state.team,state.data);render();
+   }else{await reviewTeamReport(state.team,id,status);await refresh(true);}
+   toast("Report "+status+".");
+  }catch(err){toast("Unable to review: "+err.message);}
+  return;
+ }
  const toggle=ev.target.closest("[data-toggle]");
  if(toggle){
   const task=state.data?.tasks.find(t=>String(t.id)===toggle.dataset.toggle);if(!task)return;if(!canToggle(task))return toast("Only an assigned member or lead can change this task.");
