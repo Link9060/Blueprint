@@ -2,10 +2,11 @@ import {teams,groups,channels,workspace,save,reset,progress} from "./data.js";
 import {roleLabels,rolePreviewOptions,canManageTeam,canManageWork,roleIsPreviewable} from "./roles.js";
 import {avatarColors,avatarColorNames,avatarClass,localDateTime} from "./profile.js";
 import {safeReferenceUrl,reportReasons,fabricationMethods,fabricationStatuses,fabricationLabels,fabricationStatusLabels,engineeringKinds} from "./engineering.js";
-import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,editLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,editLiveEvent,addLiveAnnouncement,getLiveProfile,saveLiveProfile,updateOwnSubgroup,subscribeTeam,reportTeamMessage,reviewTeamReport,setMessageVisibility,createEngineeringLink,deleteEngineeringLink,requestPart,setPartStatus} from "./supabase.js";
+import {inventoryUnits,milestoneStatuses,milestoneLabels,stockCoverage,milestonesFor,milestoneProgress,validQuantity} from "./planning.js";
+import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,editLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,editLiveEvent,addLiveAnnouncement,getLiveProfile,saveLiveProfile,updateOwnSubgroup,subscribeTeam,reportTeamMessage,reviewTeamReport,setMessageVisibility,createEngineeringLink,deleteEngineeringLink,requestPart,setPartStatus,createInventoryItem,updateInventoryItem,createBomLine,updateBomLine,removeBomLine,createProjectMilestone,updateProjectMilestone,removeProjectMilestone} from "./supabase.js";
 
 const app=document.getElementById("app");
-const state={team:sessionStorage.getItem("blueprint-selected-team")||null,view:"overview",filter:"all",channel:"general",modal:null,menu:false,editingTaskId:null,editingProjectId:null,editingLogId:null,editingEventId:null,reportMessageId:null,linkProjectId:null,profile:null,authNotice:"",unsubscribe:null,subscriptionTeam:null,refreshBusy:false,realtimeTimer:null,taskScope:"all",rolePreview:null,mode:configured()?"live":"demo",user:null,member:null,data:null,loading:false,error:""};
+const state={team:sessionStorage.getItem("blueprint-selected-team")||null,view:"overview",filter:"all",channel:"general",modal:null,menu:false,editingTaskId:null,editingProjectId:null,editingLogId:null,editingEventId:null,editingStockId:null,editingBomId:null,editingMilestoneId:null,planningProjectId:null,reportMessageId:null,linkProjectId:null,profile:null,authNotice:"",unsubscribe:null,subscriptionTeam:null,refreshBusy:false,realtimeTimer:null,taskScope:"all",rolePreview:null,mode:configured()?"live":"demo",user:null,member:null,data:null,loading:false,error:""};
 const glyphs={
  overview:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
  tasks:'<path d="M9 5h12M9 12h12M9 19h12"/><path d="m3 5 1.3 1.3L6.5 4M3 12l1.3 1.3L6.5 11M3 19l1.3 1.3L6.5 18"/>',
@@ -30,7 +31,7 @@ function icon(name,size=17){return '<svg width="'+size+'" height="'+size+'" view
 function e(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function a(view,label,ico){return '<button type="button" data-view="'+view+'" class="'+(state.view===view?"active":"")+'"><span class="nav-icon">'+icon(ico)+'</span>'+label+'</button>';}
 function button(text,action,kind=""){
- const locked=previewReadOnly()&&["new-task","new-log","new-project","new-event","new-announcement","new-part"].includes(action);
+ const locked=previewReadOnly()&&["new-task","new-log","new-project","new-event","new-announcement","new-part","new-stock"].includes(action);
  return '<button class="btn '+kind+'" type="button" data-action="'+action+'" '+(locked?"disabled":"")+'>'+text+'</button>';
 }
 function currentTeam(){return teams.find(t=>t.id===state.team)||teams[0];}
@@ -129,6 +130,7 @@ function renderLogs(){
  return heading("ENGINEERING HISTORY","Build log","Keep a reliable record of what changed, why it changed, and what comes next.",canEdit()?button(icon("plus",15)+" Add entry","new-log","primary"):"")+sampleNote()+section("Recent changes","",'<div class="timeline">'+(entries||'<div class="empty">No updates yet.</div>')+'</div>');
 }
 function renderProjects(){
+ const coverage=new Map(stockCoverage(state.data.inventory||[],state.data.bom||[]).map(i=>[i.id,i]));
  const cards=state.data.projects.map(p=>{
   const references=(state.data.projectLinks||[]).filter(link=>link.project_id===p.id);
   const links=references.map(link=>{
@@ -137,16 +139,63 @@ function renderProjects(){
     '<small>'+e(link.kind.toUpperCase())+'</small>'+
     (canEdit()?'<button type="button" class="subtle-action" data-remove-reference="'+e(link.id)+'" aria-label="Remove reference '+e(link.title)+'">Remove</button>':"")+'</div>';
   }).join("");
+  const bom=(state.data.bom||[]).filter(b=>b.project_id===p.id);
+  const bomHtml=bom.map(b=>{
+   const stock=coverage.get(b.inventory_id);
+   return '<div class="planning-line"><div><b>'+e(stock?.name||"Unavailable stock item")+'</b>'+
+    '<small>Need '+Number(b.quantity_required)+' '+e(stock?.unit||"each")+
+    ' · Stock '+Number(stock?.quantity_on_hand||0)+
+    (stock?.shortfall>0?' · <strong class="shortage-text">Team short '+stock.shortfall+'</strong>':"")+'</small></div>'+
+    (canEdit()?'<button type="button" class="subtle-action" data-edit-bom="'+e(b.id)+'">Edit</button>':"")+'</div>';
+  }).join("");
+  const milestones=milestonesFor(state.data.milestones||[],p.id);
+  const milestonesHtml=milestones.map(m=>
+   '<div class="planning-line"><div><b>'+e(m.title)+'</b><small>'+e(milestoneLabels[m.status]||"Planned")+
+   (m.due_on?' · Due '+e(m.due_on):"")+'</small></div>'+
+   (canEdit()?'<button type="button" class="subtle-action" data-edit-milestone="'+e(m.id)+'">Edit</button>':"")+'</div>'
+  ).join("");
   return '<article class="card project"><div class="project-icon">'+e(p.icon||"◇")+'</div><h3>'+e(p.name)+'</h3><p>'+e(p.description)+'</p>'+
    '<div class="project-foot"><small>'+e(p.lead||p.subgroup||"General")+' · '+Number(p.progress||0)+'% progress</small>'+
    '<div class="track"><i style="width:'+Math.max(0,Math.min(100,Number(p.progress)||0))+'%"></i></div>'+
    '<div class="project-references"><div class="reference-heading">ENGINEERING REFERENCES</div>'+
    (links||'<small class="muted">No CAD or drawing links attached yet.</small>')+
    (canEdit()?'<button type="button" class="btn small" data-add-reference="'+e(p.id)+'">'+icon("plus",13)+' Add reference</button>':"")+'</div>'+
+   '<div class="planning-panel"><div class="planning-panel-heading"><b>BILL OF MATERIALS</b><span>'+bom.length+' lines</span></div>'+
+   (bomHtml||'<small class="muted">No catalog parts required yet.</small>')+
+   (canEdit()?'<button type="button" class="btn small" data-add-bom="'+e(p.id)+'">'+icon("plus",13)+' Add BOM item</button>':"")+'</div>'+
+   '<div class="planning-panel"><div class="planning-panel-heading"><b>MILESTONES</b><span>'+milestoneProgress(milestones)+'% done</span></div>'+
+   (milestonesHtml||'<small class="muted">No milestones planned yet.</small>')+
+   (canEdit()?'<button type="button" class="btn small" data-add-milestone="'+e(p.id)+'">'+icon("plus",13)+' Add milestone</button>':"")+'</div>'+
    (canEdit()?'<div class="project-edit-actions"><button type="button" class="btn small" data-edit-project="'+e(p.id)+'">'+icon("pencil",13)+' Edit project</button></div>':"")+'</div></article>';
  }).join("");
- return heading("THE ROBOT","Projects & subsystems","Robot workstreams with versioned CAD references, documents and progress.",canEdit()?button(icon("plus",15)+" New project","new-project","primary"):"")+
+ return heading("THE ROBOT","Projects & subsystems","CAD references, build requirements and milestones organized by robot subsystem.",canEdit()?button(icon("plus",15)+" New project","new-project","primary"):"")+
   sampleNote()+'<div class="grid-three">'+(cards||'<div class="empty">No projects yet. A team lead can create the first one.</div>')+'</div>';
+}
+function renderInventory(){
+ const rows=stockCoverage(state.data.inventory||[],state.data.bom||[]);
+ const short=rows.filter(x=>x.shortfall>0).length;
+ const low=rows.filter(x=>x.lowStock).length;
+ const cards=rows.map(item=>{
+  const labels=[
+   ['On hand',item.quantity_on_hand],
+   ['Needed on BOMs',item.required],
+   ['Reorder threshold',item.reorder_at]
+  ].map(([name,value])=>'<div class="stock-stat"><small>'+name+'</small><b>'+Number(value||0)+'</b></div>').join("");
+  return '<article class="card stock-card"><div class="stock-card-top"><div><span class="eyebrow">'+e(item.sku||"CATALOG PART")+'</span>'+
+   '<h3>'+e(item.name)+'</h3><small>'+e(item.unit)+' · '+e(item.storage_location||"Unassigned location")+'</small></div>'+
+   (item.shortfall>0?'<span class="pill blocked">Short '+item.shortfall+'</span>':
+    item.lowStock?'<span class="pill">At reorder threshold</span>':'<span class="pill complete">Available</span>')+'</div>'+
+   '<div class="stock-stats">'+labels+'</div>'+
+   (item.notes?'<p class="stock-notes">'+e(item.notes)+'</p>':"")+
+   (canEdit()?'<button class="btn small" type="button" data-edit-stock="'+e(item.id)+'">'+icon("pencil",13)+' Edit stock</button>':"")+
+   '</article>';
+ }).join("");
+ return heading("MATERIALS","Parts inventory","Catalog team parts and compare available stock against all project bills of materials.",
+  canEdit()?button(icon("plus",15)+" Add stock item","new-stock","primary"):"")+
+  sampleNote()+
+  '<div class="planning-summary"><span>'+rows.length+' catalog items</span><span>'+short+' shortages</span><span>'+low+' at reorder threshold</span></div>'+
+  '<div class="stock-grid">'+(cards||'<div class="empty">No stock items yet. A team lead can create the catalog.</div>')+'</div>'+
+  '<p class="hint">BOM quantities represent planned requirements across projects. Available stock counts are entered by your team and are not automatically decremented.</p>';
 }
 
 function renderPeople(){
@@ -275,12 +324,12 @@ function renderSettings(){
 }
 function canEdit(){return canManageWork(effectiveRole());}
 function sidebar(){
- const navigation=a("overview","Overview","overview")+a("announcements","Announcements","bell")+a("tasks","Tasks","tasks")+a("logs","Build log","logs")+a("projects","Robot projects","projects")+a("manufacturing","Manufacturing","projects")+a("messages","Messages","messages")+a("calendar","Calendar","calendar")+a("people","Members","people");
+ const navigation=a("overview","Overview","overview")+a("announcements","Announcements","bell")+a("tasks","Tasks","tasks")+a("logs","Build log","logs")+a("projects","Robot projects","projects")+a("manufacturing","Manufacturing","projects")+a("inventory","Inventory","projects")+a("messages","Messages","messages")+a("calendar","Calendar","calendar")+a("people","Members","people");
  return '<div class="screen '+(state.menu?"show":"")+'" data-action="close-menu"></div><aside class="side '+(state.menu?"open":"")+'"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><button class="team-picker" data-action="switch-team"><span class="team-box">'+e(state.team)+'</span><span><b>'+e(currentTeam().name)+'</b><small>Team workspace</small></span><span class="chev">'+icon("chevron",14)+'</span></button>'+previewSelector("sidebar")+'<div class="side-caption">WORKSPACE</div><nav class="nav" aria-label="Workspace">'+navigation+'</nav><div class="side-caption">GENERAL</div><nav class="nav" aria-label="General">'+(canAdmin()?a("admin","Membership","people")+a("safety","Moderation","info"):"")+a("profile","My profile","people")+a("settings","Settings","settings")+'</nav><div class="side-bottom">'+avatarHtml(currentProfile().full_name||state.user?.user_metadata?.full_name||"Preview User",currentProfile().avatar_color)+'<div><b>'+(state.mode==="demo"?"Preview user":e(currentProfile().full_name||state.user?.user_metadata?.full_name||"Team member"))+'</b><small>'+(state.mode==="demo"?"Demo workspace":e(roleLabels[actualRole()]||"Member"))+'</small></div><button class="push" data-action="sign-out" aria-label="Leave workspace">'+icon("logout",17)+'</button></div></aside>';
 }
 function shell(){
- const views={overview:renderOverview,announcements:renderAnnouncements,tasks:renderTasks,logs:renderLogs,projects:renderProjects,messages:renderMessages,calendar:renderCalendar,people:renderPeople,admin:renderAdmin,safety:renderSafety,manufacturing:renderManufacturing,profile:renderProfile,settings:renderSettings};
- const labels={overview:"Overview",announcements:"Announcements",tasks:"Tasks",logs:"Build log",projects:"Robot projects",messages:"Messages",calendar:"Calendar",people:"Members",admin:"Membership",safety:"Moderation",manufacturing:"Manufacturing",profile:"My profile",settings:"Settings"};
+ const views={overview:renderOverview,announcements:renderAnnouncements,tasks:renderTasks,logs:renderLogs,projects:renderProjects,messages:renderMessages,calendar:renderCalendar,people:renderPeople,admin:renderAdmin,safety:renderSafety,manufacturing:renderManufacturing,inventory:renderInventory,profile:renderProfile,settings:renderSettings};
+ const labels={overview:"Overview",announcements:"Announcements",tasks:"Tasks",logs:"Build log",projects:"Robot projects",messages:"Messages",calendar:"Calendar",people:"Members",admin:"Membership",safety:"Moderation",manufacturing:"Manufacturing",inventory:"Inventory",profile:"My profile",settings:"Settings"};
  return '<div class="shell">'+sidebar()+'<main class="main"><div class="bar"><div class="actions"><button class="round-button mobile-toggle" data-action="menu" aria-label="Open menu">'+icon("menu")+'</button><div class="crumb">Team '+e(state.team)+' <span>/</span> '+labels[state.view]+'</div></div><div class="bar-right"><span class="eyebrow" style="letter-spacing:.8px">'+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+'</span><button class="round-button" aria-label="Refresh workspace" data-action="refresh-live" title="Refresh workspace">↻</button><button class="round-button" aria-label="Notifications" data-action="notifications">'+icon("bell")+'</button><span class="bar-avatar">'+(state.mode==="demo"?"BP":"TM")+'</span></div></div>'+previewBanner()+'<div class="content enter">'+(views[state.view]||renderOverview)()+'</div></main></div>';
 }
 function landing(){
