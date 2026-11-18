@@ -618,6 +618,22 @@ app.addEventListener("click",async ev=>{
  if(button){await dispatchAction(button.dataset.action);}
 });
 app.addEventListener("change",async ev=>{
+ const partStatus=ev.target.closest("[data-part-status]");
+ if(partStatus){
+  if(previewReadOnly()||!canEdit())return toast("Only a Lead or above can update manufacturing progress.");
+  const id=partStatus.dataset.partStatus,status=partStatus.value;
+  if(!fabricationStatuses.includes(status))return;
+  try{
+   if(state.mode==="demo"){
+    const item=state.data.partRequests.find(x=>x.id===id);
+    if(item){item.status=status;item.updated_at=new Date().toISOString();}
+    state.data.activity.unshift({id:"demo-audit-"+Date.now(),action:"part_status_updated",subject_type:"part_requests",subject_id:id,actor:"You (preview)",created_at:new Date().toISOString()});
+    save(state.team,state.data);render();
+   }else{await setPartStatus(state.team,id,status);await refresh(true);}
+   toast("Manufacturing progress updated.");
+  }catch(err){toast("Could not update part: "+err.message);if(state.mode==="live")await refresh(true);}
+  return;
+ }
  const roleSelection=ev.target.closest("[data-preview-role]");
  if(roleSelection){
   if(!mayPreview())return;
