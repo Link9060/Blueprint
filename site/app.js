@@ -843,7 +843,7 @@ app.addEventListener("submit",async ev=>{
    state.editingLogId=null;state.modal=null;state.view="logs";
  }else{
   const text=String(f.get("body")||"").trim().slice(0,1000);if(!text)return;
-  if(state.mode==="demo"){(state.data.messages[state.channel]||=([])).push({author:"You (preview)",initials:"YP",time:new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),text});save(state.team,state.data);}
+  if(state.mode==="demo"){(state.data.messages[state.channel]||=([])).push({id:"demo-message-"+Date.now(),author:"You (preview)",initials:"YP",time:new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),text,hidden:false});save(state.team,state.data);}
   else await sendLiveMessage(state.team,state.channel,text,state.user.id);
  }
  if(state.mode==="live")await refresh();else render();
