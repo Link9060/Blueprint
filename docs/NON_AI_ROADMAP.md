@@ -2,7 +2,7 @@
 
 **Current build:** teams 1810 and 9316. The dedicated Supabase project is separate from Relay, ARROW and all other projects.
 
-## Delivered through v6
+## Delivered through v7
 
 - Google/email authentication flows and verified, team-scoped Owner role
 - Membership approval and member roles, including visual-only role inspector
@@ -14,6 +14,8 @@
 - Shared inventory catalog with quantity-on-hand, reorder thresholds and storage locations
 - Project-specific bills of materials, combined team demand and shortage calculations
 - Project milestones with due dates, status tracking and owner-level activity auditing
+- Task prerequisites with completion blocking and transitive cycle checks
+- Calendar-event preparation checklists with assigned-member completion
 - Automated JavaScript and PostgreSQL RLS isolation tests
 
 ## Pilot-readiness gates (high priority)
@@ -26,11 +28,11 @@
 
 ## Engineering functionality to build after the pilot foundation
 
-- Task dependencies, milestone dependencies, project checklists and responsibility handoffs
+- Milestone-to-milestone dependencies, project test checklists and responsibility handoffs
 - Versioned CAD drawings, revision approvals, and private file storage with scoped permissions
 - Stock movements, inventory adjustments history, supplier details and part request-to-inventory links
 - Build/test gates, measurements, test results, and documented engineering change requests
-- Event and competition preparation: deadlines, checklists, pit tasks, packing lists, meeting reminders
+- Competition scheduling beyond event checklists: arrival/departure planning, pit staffing, packing templates and optional meeting reminders
 - Optional notifications, unread indicators, and user-controlled quiet settings
 
 ## Important limits
@@ -41,3 +43,4 @@
 - Stock is counted manually and BOM demand is planned, not reserved. Creating a manufacturing request or marking it complete does not change catalog quantities or initiate purchases.
 - Role previews change only the interface; only separate signed-in users test the actual database policies.
 - AI features and AI-generated reports are **not** part of this work.
+- Checklists are for team coordination, not a substitute for official competition, school, travel or inspection procedures.

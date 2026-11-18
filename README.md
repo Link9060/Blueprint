@@ -49,6 +49,13 @@ These tests do **not** replace real-browser tests, real Google/email provider ve
 
 Approved teammates can see a member's chosen name, headline, bio, avatar color, and subgroup. Email addresses remain private in Supabase Auth. Members can edit their own profile and approved-team subgroup, not roles or permissions. Managers can edit log/event contents but original authorship is retained, with edits attributed to the editor. Role previews remain visual and read-only.
 
+## Non-AI coordination release (v7)
+
+- **Task prerequisites:** A Lead or higher can link tasks into prerequisite chains. Blueprint shows unfinished blockers and refuses completion until prerequisites are done. Database triggers reject direct-API bypasses and circular links.
+- **Event preparation:** Each calendar event can have packing, pit, inspection, travel, and miscellaneous checklist items. Leads create/edit and assign items, while assigned teammates can check their own items off.
+- **Team isolation:** Every prerequisite and checklist entry belongs to its own team. Database RLS and cross-team foreign-key checks prevent students from seeing or linking another team's records.
+- **Manual preparation:** No reminders, notifications, AI, purchases, or external integrations were activated. Preview data is fictional and local to the browser.
+
 ## Non-AI planning release (v6)
 
 - **Team inventory:** Leads, mentors, captains, admins and owners can create and update catalog entries, quantities, reorder thresholds and storage locations. All approved teammates can view inventory.
