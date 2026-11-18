@@ -77,11 +77,11 @@ const initialMessages={
 function clone(value){return JSON.parse(JSON.stringify(value));}
 function make(team){
  const base=clone(library[team]||library["1810"]);
- const people=base.people.map((p,i)=>({...p,id:"demo-"+team+"-"+i,status:"approved"}));
+ const people=base.people.map((p,i)=>({...p,id:"demo-"+team+"-"+i,status:"approved",avatar_color:(["slate","blue","sage","amber","violet","rose"])[i%6],headline:"Robotics team member",bio:""}));
  const tasks=base.tasks.map((t,i)=>({...t,assigned_to:i<3?people[i%people.length]?.id:null,priority:t.priority||"Normal",due_date:""}));
  const projects=base.projects.map((p,i)=>({...p,id:"demo-"+team+"-project-"+i,subgroup:p.lead}));
  const pending=[{user_id:"demo-pending-"+team,name:"Jamie L.",subgroup:"Design",role:"member",status:"pending"}];
- return {team,name:base.name,tasks,projects,logs:base.logs,people,pending,events:clone(commonEvents),messages:clone(initialMessages)};
+ return {team,name:base.name,tasks,projects,logs:base.logs,people,pending,profile:{full_name:"Preview User",headline:"Building our next robot",bio:"Use this fictional profile to explore the editor.",avatar_color:"blue"},events:clone(commonEvents).map((ev,i)=>({...ev,id:"demo-"+team+"-event-"+i,starts_at:new Date(new Date().getFullYear(),10,Number(ev.day),[15,16,15][i],[30,0,45][i]).toISOString()})),messages:clone(initialMessages)};
 }
 export const teams=[{id:"1810",name:"CATATRONICS"},{id:"9316",name:"CUBATRONICS"}];
 export const groups=["Design","Mechanical","Manufacturing","Electrical","Programming","Strategy","Business"];
@@ -97,6 +97,8 @@ export function workspace(team){
    merged.people=(merged.people||[]).map((p,i)=>({...p,id:p.id||"demo-"+team+"-"+i,status:p.status||"approved"}));
    merged.projects=(merged.projects||[]).map((p,i)=>({...p,id:p.id||"demo-"+team+"-project-"+i,subgroup:p.subgroup||p.lead}));
    merged.pending=Array.isArray(merged.pending)?merged.pending:fallback.pending;
+   merged.events=(merged.events||[]).map((ev,i)=>({...ev,id:ev.id||"demo-"+team+"-event-"+i,starts_at:ev.starts_at||fallback.events[i%fallback.events.length]?.starts_at||""}));
+   merged.profile={...fallback.profile,...(merged.profile||{})};
    return merged;
  }catch{return fallback;}
 }
