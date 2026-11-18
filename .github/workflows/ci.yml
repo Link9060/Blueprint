@@ -61,8 +61,11 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/upgrade_v4_edit_profiles.sql
       - name: Apply moderation and engineering schema
         run: psql -v ON_ERROR_STOP=1 -f database/upgrade_v5_team_safety_engineering.sql
+      - name: Apply inventory BOM and milestone schema
+        run: psql -v ON_ERROR_STOP=1 -f database/upgrade_v6_inventory_bom_milestones.sql
       - name: Verify team isolation and permissions
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/security.sql
           psql -v ON_ERROR_STOP=1 -f tests/edit_profiles_security.sql
           psql -v ON_ERROR_STOP=1 -f tests/moderation_engineering_security.sql
+          psql -v ON_ERROR_STOP=1 -f tests/planning_security.sql
