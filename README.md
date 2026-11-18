@@ -49,6 +49,14 @@ These tests do **not** replace real-browser tests, real Google/email provider ve
 
 Approved teammates can see a member's chosen name, headline, bio, avatar color, and subgroup. Email addresses remain private in Supabase Auth. Members can edit their own profile and approved-team subgroup, not roles or permissions. Managers can edit log/event contents but original authorship is retained, with edits attributed to the editor. Role previews remain visual and read-only.
 
+## Non-AI planning release (v6)
+
+- **Team inventory:** Leads, mentors, captains, admins and owners can create and update catalog entries, quantities, reorder thresholds and storage locations. All approved teammates can view inventory.
+- **BOMs:** Each project links to parts from its own team's catalog with required quantities and notes. Quantities from multiple projects are summed to show team-wide shortfalls.
+- **Milestones:** Team leadership can create and edit project checkpoints, due dates and status. Approved teammates can follow progress.
+- **Audit and isolation:** The planning records use the existing team-scoped PostgreSQL policies and append-only administrator activity history. CI checks cross-team foreign-key protections and member-versus-lead permissions.
+- **Important:** Inventory is a manually recorded estimate, not a live warehouse system. BOM demand does not automatically subtract from available stock and no purchases/orders are placed by Blueprint.
+
 ## Non-AI engineering and safety release (v5)
 
 - **Message safety:** Approved teammates can privately report a channel message; reports are visible only to the reporter and their team administrators. Admins can mark reports reviewed/dismissed and hide or restore messages without destroying the originals.

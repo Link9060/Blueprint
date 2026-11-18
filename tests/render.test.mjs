@@ -146,7 +146,7 @@ test("landing and sample workspace views render without browser dependencies", a
  await handlers.submit({target:{id:"bom-form",values:{
   inventory_id:"demo-1810-stock-1",quantity_required:"150",notes:"Frame test requirement"
  }},preventDefault(){}});
- assert.ok(html.includes("Frame test requirement")===false || html.includes("6061 aluminum tube"));
+ assert.ok(html.includes("Need 150 mm"),"New BOM requirement appears under the project");
  await handlers.click({target:fakeTarget("[data-edit-bom]","editBom","demo-1810-bom-0")});
  assert.ok(html.includes('id="bom-form"'));
  await handlers.submit({target:{id:"bom-form",values:{
