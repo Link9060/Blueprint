@@ -3,10 +3,11 @@ import {roleLabels,rolePreviewOptions,canManageTeam,canManageWork,roleIsPreviewa
 import {avatarColors,avatarColorNames,avatarClass,localDateTime} from "./profile.js";
 import {safeReferenceUrl,reportReasons,fabricationMethods,fabricationStatuses,fabricationLabels,fabricationStatusLabels,engineeringKinds} from "./engineering.js";
 import {inventoryUnits,milestoneStatuses,milestoneLabels,stockCoverage,milestonesFor,milestoneProgress,validQuantity} from "./planning.js";
-import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,editLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,editLiveEvent,addLiveAnnouncement,getLiveProfile,saveLiveProfile,updateOwnSubgroup,subscribeTeam,reportTeamMessage,reviewTeamReport,setMessageVisibility,createEngineeringLink,deleteEngineeringLink,requestPart,setPartStatus,createInventoryItem,updateInventoryItem,createBomLine,updateBomLine,removeBomLine,createProjectMilestone,updateProjectMilestone,removeProjectMilestone} from "./supabase.js";
+import {preparationCategories,preparationLabels,taskPrerequisites,taskBlockers,wouldCreateCycle,eventPreparation,preparationProgress} from "./coordination.js";
+import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,editLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,editLiveEvent,addLiveAnnouncement,getLiveProfile,saveLiveProfile,updateOwnSubgroup,subscribeTeam,reportTeamMessage,reviewTeamReport,setMessageVisibility,createEngineeringLink,deleteEngineeringLink,requestPart,setPartStatus,createInventoryItem,updateInventoryItem,createBomLine,updateBomLine,removeBomLine,createProjectMilestone,updateProjectMilestone,removeProjectMilestone,addTaskDependency,removeTaskDependency,addEventChecklistItem,editEventChecklistItem,setChecklistStatus,deleteEventChecklistItem} from "./supabase.js";
 
 const app=document.getElementById("app");
-const state={team:sessionStorage.getItem("blueprint-selected-team")||null,view:"overview",filter:"all",channel:"general",modal:null,menu:false,editingTaskId:null,editingProjectId:null,editingLogId:null,editingEventId:null,editingStockId:null,editingBomId:null,editingMilestoneId:null,planningProjectId:null,reportMessageId:null,linkProjectId:null,profile:null,authNotice:"",unsubscribe:null,subscriptionTeam:null,refreshBusy:false,realtimeTimer:null,taskScope:"all",rolePreview:null,mode:configured()?"live":"demo",user:null,member:null,data:null,loading:false,error:""};
+const state={team:sessionStorage.getItem("blueprint-selected-team")||null,view:"overview",filter:"all",channel:"general",modal:null,menu:false,editingTaskId:null,editingProjectId:null,editingLogId:null,editingEventId:null,editingStockId:null,editingBomId:null,editingMilestoneId:null,planningProjectId:null,dependencyTaskId:null,checklistEventId:null,editingChecklistId:null,reportMessageId:null,linkProjectId:null,profile:null,authNotice:"",unsubscribe:null,subscriptionTeam:null,refreshBusy:false,realtimeTimer:null,taskScope:"all",rolePreview:null,mode:configured()?"live":"demo",user:null,member:null,data:null,loading:false,error:""};
 const glyphs={
  overview:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
  tasks:'<path d="M9 5h12M9 12h12M9 19h12"/><path d="m3 5 1.3 1.3L6.5 4M3 12l1.3 1.3L6.5 11M3 19l1.3 1.3L6.5 18"/>',
@@ -55,10 +56,18 @@ function previewSelector(slot="sidebar"){
 function previewBanner(){
  return previewReadOnly()?'<div class="role-preview-banner" role="status"><div><b>Viewing as '+roleLabels[effectiveRole()]+'</b><span>Visual preview only. Your real access stays '+roleLabels[actualRole()]+'. All edits are disabled. Test accounts are needed to verify database permissions.</span></div><button type="button" class="btn small" data-action="end-role-preview">Exit preview</button></div>':"";
 }
-function canToggle(t){return !previewReadOnly()&&(canEdit()||(state.mode==="demo"?Boolean(t.assigned_to):Boolean(t.assigned_to&&t.assigned_to===state.user?.id)));}
+function canToggle(t){
+ const authorized=!previewReadOnly()&&(canEdit()||(state.mode==="demo"?Boolean(t.assigned_to):Boolean(t.assigned_to&&t.assigned_to===state.user?.id)));
+ return authorized&&(t.status==="done"||taskBlockers(t.id,state.data.taskDependencies||[],state.data.tasks).length===0);
+}
+function canToggleChecklist(item){return !previewReadOnly()&&(canEdit()||(state.mode==="demo"?Boolean(item.assigned_to):Boolean(item.assigned_to&&item.assigned_to===state.user?.id)));}
 function assignee(t){return state.data.people.find(p=>p.id===t.assigned_to)?.name||"Unassigned";}
+function blockerLabel(t){
+ const blockers=taskBlockers(t.id,state.data.taskDependencies||[],state.data.tasks);
+ return blockers.length?'<small class="dependency-warning">'+icon("info",12)+' Waiting for '+e(blockers.map(x=>x.title).join(", "))+'</small>':"";
+}
 function taskLine(t){
- return '<div class="task"><button class="task-check '+(t.status==="done"?"done":"")+'" data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" '+(canToggle(t)?"":"disabled title=\"Only assignees and leads can update status\"")+'></button><div class="task-body"><b class="'+(t.status==="done"?"strike":"")+'">'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(assignee(t))+' · '+e(t.due)+'</small></div>'+pill(t.status)+'</div>';
+ return '<div class="task"><button class="task-check '+(t.status==="done"?"done":"")+'" data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" '+(canToggle(t)?"":"disabled title=\"Only assignees and leads can update status\"")+'></button><div class="task-body"><b class="'+(t.status==="done"?"strike":"")+'">'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(assignee(t))+' · '+e(t.due)+'</small>'+blockerLabel(t)+'</div>'+pill(t.status)+'</div>';
 }
 function renderOverview(){
  const d=state.data;
@@ -114,12 +123,26 @@ function renderOverview(){
 }
 
 function renderTasks(){
- const tasks=state.data.tasks.filter(t=>(state.filter==="all"||t.status===state.filter)&&(state.taskScope==="all"||(state.mode==="demo"?t.assigned_to!=null:t.assigned_to===state.user?.id)));
+ const tasks=state.data.tasks.filter(t=>(state.filter==="all"||t.status===state.filter)&&
+  (state.taskScope==="all"||(state.mode==="demo"?t.assigned_to!=null:t.assigned_to===state.user?.id)));
  const allowed=canEdit();
  const statusFilters=[["all","All statuses"],["todo","To do"],["in_progress","In progress"],["blocked","Blocked"],["done","Complete"]];
- const scope='<div class="scope-switch"><button data-task-scope="all" class="'+(state.taskScope==="all"?"active":"")+'">Team tasks</button><button data-task-scope="mine" class="'+(state.taskScope==="mine"?"active":"")+'">'+(state.mode==="demo"?"Assigned tasks":"My tasks")+'</button></div>';
- return heading("PROJECT COORDINATION","Tasks & assignments","Clear ownership, useful deadlines, fewer missed handoffs.",allowed?button(icon("plus",15)+" New task","new-task","primary"):"")+sampleNote()+'<div class="task-toolbar">'+scope+'<div class="filter-row">'+statusFilters.map(x=>'<button class="filter '+(state.filter===x[0]?"active":"")+'" data-filter="'+x[0]+'">'+x[1]+'</button>').join("")+'</div></div><div>'+tasks.map(t=>'<div class="card entry"><button data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" class="task-check '+(t.status==="done"?"done":"")+'" '+(canToggle(t)?"":"disabled")+'></button><div class="entry-main"><b>'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(assignee(t))+' · Due '+e(t.due)+' · '+e(t.priority)+' priority</small></div>'+pill(t.status)+(allowed?'<div class="entry-actions"><button type="button" class="btn small" data-edit-task="'+e(t.id)+'">'+icon("pencil",13)+' Edit</button></div>':"")+'</div>').join("")+'</div>'+(tasks.length?"":'<div class="empty">No tasks match this view.</div>');
+ const scope='<div class="scope-switch"><button data-task-scope="all" class="'+(state.taskScope==="all"?"active":"")+'">Team tasks</button>'+
+  '<button data-task-scope="mine" class="'+(state.taskScope==="mine"?"active":"")+'">'+(state.mode==="demo"?"Assigned tasks":"My tasks")+'</button></div>';
+ const entries=tasks.map(t=>{
+  const prereqs=taskPrerequisites(t.id,state.data.taskDependencies||[],state.data.tasks);
+  const dependencyDetail=prereqs.length?'<small class="prereq-detail">Depends on: '+e(prereqs.map(x=>x.title+(x.status==="done"?" ✓":"")).join(", "))+'</small>':"";
+  return '<div class="card entry"><button type="button" data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" class="task-check '+(t.status==="done"?"done":"")+'" '+(canToggle(t)?"":'disabled title="Complete prerequisites or request a Lead"')+'></button>'+
+  '<div class="entry-main"><b>'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(assignee(t))+' · Due '+e(t.due)+' · '+e(t.priority)+' priority</small>'+blockerLabel(t)+dependencyDetail+'</div>'+
+  pill(t.status)+(allowed?'<div class="entry-actions"><button type="button" class="btn small" data-edit-task="'+e(t.id)+'">'+icon("pencil",13)+' Edit</button>'+
+  '<button type="button" class="btn small" data-add-dependency="'+e(t.id)+'">Prerequisites</button></div>':"")+'</div>';
+ }).join("");
+ return heading("PROJECT COORDINATION","Tasks & assignments","Track ownership, deadlines and prerequisites before marking work complete.",
+  allowed?button(icon("plus",15)+" New task","new-task","primary"):"")+
+  sampleNote()+'<div class="task-toolbar">'+scope+'<div class="filter-row">'+statusFilters.map(x=>'<button class="filter '+(state.filter===x[0]?"active":"")+'" data-filter="'+x[0]+'">'+x[1]+'</button>').join("")+'</div></div>'+
+  '<div>'+entries+'</div>'+(tasks.length?"":'<div class="empty">No tasks match this view.</div>');
 }
+
 function renderLogs(){
  const entries=state.data.logs.map(l=>
   '<article class="log"><div class="record-title"><h3>'+e(l.title)+'</h3>'+
@@ -208,16 +231,28 @@ function renderPeople(){
  return heading("PEOPLE & ROLES","Team directory","Find the right person or subgroup for the next step.")+sampleNote()+'<div class="people">'+(cards||'<div class="empty">The directory will populate when members join.</div>')+'</div>';
 }
 function renderCalendar(){
- const cards=state.data.events.map(ev=>
-  '<div class="card event"><div class="event-date"><b>'+e(ev.day)+'</b><small>'+e(ev.month)+'</small></div>'+
-  '<div class="event-info"><b>'+e(ev.title)+'</b><small>'+e(ev.details)+
-  (ev.edited_at?' · Updated by '+e(ev.edited_by||"Team lead"):"")+'</small></div>'+
-  '<span class="pill">'+e(ev.type)+'</span>'+
-  (canEdit()?'<button type="button" class="btn small record-edit" data-edit-event="'+e(ev.id)+'">'+icon("pencil",13)+' Edit</button>':"")+
-  '</div>'
- ).join("");
- return heading("LOOKING AHEAD","Schedule","Build meetings, reviews, and important team milestones.",canEdit()?button(icon("plus",15)+" New event","new-event","primary"):"")+sampleNote()+'<div class="events">'+(cards||'<div class="empty">No events are scheduled yet.</div>')+'</div>';
+ const cards=state.data.events.map(ev=>{
+  const items=eventPreparation(state.data.eventChecklist||[],ev.id);
+  const summary=preparationProgress(items);
+  const checklist=items.map(item=>{
+   const assigned=state.data.people.find(p=>p.id===item.assigned_to)?.name||"Unassigned";
+   return '<div class="event-checklist-item"><button type="button" data-checklist-toggle="'+e(item.id)+'" aria-label="Toggle '+e(item.title)+'" class="task-check '+(item.status==="done"?"done":"")+'" '+(canToggleChecklist(item)?"":'disabled title="Assigned teammate or Lead only"')+'></button>'+
+    '<div><b class="'+(item.status==="done"?"strike":"")+'">'+e(item.title)+'</b><small>'+e(preparationLabels[item.category]||"Other")+' · '+e(assigned)+'</small></div>'+
+    (canEdit()?'<button type="button" class="subtle-action" data-edit-checklist="'+e(item.id)+'">Edit</button>':"")+'</div>';
+  }).join("");
+  return '<article class="card calendar-prep-card"><div class="calendar-event-head"><div class="event-date"><b>'+e(ev.day)+'</b><small>'+e(ev.month)+'</small></div>'+
+    '<div class="event-info"><b>'+e(ev.title)+'</b><small>'+e(ev.details)+(ev.edited_at?' · Updated by '+e(ev.edited_by||"Team lead"):"")+'</small></div>'+
+    (canEdit()?'<button type="button" class="btn small record-edit" data-edit-event="'+e(ev.id)+'">'+icon("pencil",13)+' Edit event</button>':"")+'</div>'+
+    '<div class="event-prep"><div class="planning-panel-heading"><b>EVENT PREPARATION</b><span>'+summary.done+' of '+summary.total+' ready</span></div>'+
+    '<div class="track"><i style="width:'+summary.percent+'%"></i></div>'+
+    (checklist||'<p class="hint">No prep items yet. Add equipment, pit, inspection or travel tasks.</p>')+
+    (canEdit()?'<button class="btn small" type="button" data-add-checklist="'+e(ev.id)+'">'+icon("plus",13)+' Add prep item</button>':"")+'</div></article>';
+ }).join("");
+ return heading("LOOKING AHEAD","Schedule & event prep","Meetings, competitions, packing lists and pit checklists in one place.",
+  canEdit()?button(icon("plus",15)+" New event","new-event","primary"):"")+
+  sampleNote()+'<div class="event-prep-grid">'+(cards||'<div class="empty">No events are scheduled yet.</div>')+'</div>';
 }
+
 function renderAnnouncements(){
  const cards=(state.data.announcements||[]).map(x=>'<article class="card pad" style="margin-bottom:12px"><div class="eyebrow">'+e(x.author)+' · '+e(x.time)+'</div><h3 style="font-size:15px;letter-spacing:-.3px;margin:12px 0 6px">'+e(x.title)+'</h3><p style="font-size:12px;line-height:1.8;color:#75838a;white-space:pre-wrap;margin:0">'+e(x.body)+'</p></article>').join("");
  return heading("TEAM UPDATES","Announcements","Important information, without getting lost in a conversation.",canEdit()?button(icon("plus",15)+" Publish update","new-announcement","primary"):"")+sampleNote()+(cards||'<div class="empty">Nothing posted yet. Team leads can publish the first update.</div>');
