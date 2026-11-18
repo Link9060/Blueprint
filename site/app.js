@@ -93,7 +93,7 @@ function renderMessages(){
  return heading("CONVERSATIONS","Team messages","Subgroup channels for clear, purposeful coordination.")+sampleNote()+'<div class="card chat"><aside class="channels"><h3>CHANNELS</h3>'+channels.map(c=>'<button class="channel '+(state.channel===c?"active":"")+'" data-channel="'+c+'"># '+e(c)+'</button>').join("")+'</aside><section class="conversation"><div class="chat-head"><b># '+e(state.channel)+'</b><small>Team '+e(state.team)+' · '+(state.mode==="demo"?"Local preview":"Team channel")+'</small></div><div class="messages">'+(messages||'<div class="empty">Start the conversation.</div>')+'</div><form class="compose" id="compose-form"><input class="field" name="body" maxlength="1000" placeholder="Message #'+e(state.channel)+'" aria-label="Message" required><button class="btn primary" type="submit">Send '+icon("arrow",14)+'</button></form></section></div>';
 }
 function renderSettings(){
- return heading("PREFERENCES","Workspace settings","Your current team and preview configuration.")+'<section class="card pad"><div class="setting-row"><div><b>Current team</b><small>'+e(currentTeam().name)+' · Team '+e(state.team)+'</small></div>'+button("Switch team","switch-team")+'</div><div class="setting-row"><div><b>Data connection</b><small>'+(state.mode==="demo"?"Demo data is stored in this browser only.":"Connected to a configured Supabase project.")+'</small></div><span class="pill">'+(state.mode==="demo"?"Demo":"Supabase")+'</span></div><div class="setting-row"><div><b>Google authentication</b><small>'+(state.mode==="demo"?"Set up a dedicated Supabase project to enable Google sign-in.":"Authentication uses your team's Supabase project.")+'</small></div><span class="pill">'+(state.mode==="demo"?"Not configured":"Configured")+'</span></div>'+(state.mode==="demo"?'<div class="setting-row"><div><b>Reset sample changes</b><small>Restore the original fictional tasks, build logs and messages.</small></div>'+button("Reset preview","reset")+'</div>':"")+'</section>';
+ return heading("PREFERENCES","Workspace settings","Your current team and preview configuration.")+'<section class="card pad"><div class="setting-row"><div><b>Current team</b><small>'+e(currentTeam().name)+' · Team '+e(state.team)+'</small></div>'+button("Switch team","switch-team")+'</div><div class="setting-row"><div><b>Data connection</b><small>'+(state.mode==="demo"?"Demo data is stored in this browser only.":"Connected to a configured Supabase project.")+'</small></div><span class="pill">'+(state.mode==="demo"?"Demo":"Supabase")+'</span></div><div class="setting-row"><div><b>Google authentication</b><small>'+(state.mode==="demo"?"Set up a dedicated Supabase project to enable Google sign-in.":"Authentication uses your team's Supabase project.")+'</small></div><span class="pill">'+(state.mode==="demo"?"Not configured":"Configured")+'</span></div>'+(state.mode==="demo"?'<div class="setting-row"><div><b>Reset sample changes</b><small>Restore the original fictional tasks, build logs and messages.</small></div>'+button("Reset preview","reset")+'</div><div class="setting-row"><div><b>Connect to live Blueprint</b><small>Leave the fictional sample workspace and sign into your real team.</small></div>'+button("Go live","exit-preview","primary")+'</div>':"")+'</section>';
 }
 function canEdit(){return state.mode==="demo"||["lead","captain","mentor","admin"].includes(state.member?.role);}
 function sidebar(){
@@ -106,7 +106,7 @@ function shell(){
  return '<div class="shell">'+sidebar()+'<main class="main"><div class="bar"><div class="actions"><button class="round-button mobile-toggle" data-action="menu" aria-label="Open menu">'+icon("menu")+'</button><div class="crumb">Team '+e(state.team)+' <span>/</span> '+labels[state.view]+'</div></div><div class="bar-right"><span class="eyebrow" style="letter-spacing:.8px">'+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+'</span><button class="round-button" aria-label="Refresh workspace" data-action="refresh-live" title="Refresh workspace">↻</button><button class="round-button" aria-label="Notifications" data-action="notifications">'+icon("bell")+'</button><span class="bar-avatar">'+(state.mode==="demo"?"BP":"TM")+'</span></div></div><div class="content enter">'+(views[state.view]||renderOverview)()+'</div></main></div>';
 }
 function landing(){
- return '<div class="landing"><div class="landing-top"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><small>ROBOTICS TEAM MANAGEMENT</small></div><main class="landing-inner enter"><span class="eyebrow">THE WORK BEHIND THE ROBOT</span><h1>A better place<br>to <em>build together.</em></h1><p class="landing-intro">Tasks, conversations, engineering logs and team progress. Organized around the people actually building the robot.</p><div class="team-choices">'+teams.map(t=>'<button class="team-choice" data-team="'+t.id+'"><strong>'+t.id+'</strong><span>'+e(t.name)+'</span><small>'+(state.mode==="demo"?"OPEN PREVIEW":"CONTINUE TO SIGN IN")+' &nbsp; →</small></button>').join("")+'</div><div style="margin-top:18px"><span class="demo-label">'+(state.mode==="demo"?"PREVIEW MODE · SAMPLE DATA":"SECURE GOOGLE SIGN-IN")+'</span></div></main><footer class="landing-foot"><span>Blueprint · Made for the build season</span><span>Teams 1810 & 9316</span></footer></div>';
+ return '<div class="landing"><div class="landing-top"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><small>ROBOTICS TEAM MANAGEMENT</small></div><main class="landing-inner enter"><span class="eyebrow">THE WORK BEHIND THE ROBOT</span><h1>A better place<br>to <em>build together.</em></h1><p class="landing-intro">Tasks, conversations, engineering logs and team progress. Organized around the people actually building the robot.</p><div class="team-choices">'+teams.map(t=>'<button class="team-choice" data-team="'+t.id+'"><strong>'+t.id+'</strong><span>'+e(t.name)+'</span><small>'+(state.mode==="demo"?"OPEN PREVIEW":"CONTINUE TO SIGN IN")+' &nbsp; →</small></button>').join("")+'</div><div style="margin-top:18px"><span class="demo-label">'+(state.mode==="demo"?"PREVIEW MODE · SAMPLE DATA":"PRIVATE TEAM ACCESS")+'</span></div></main><footer class="landing-foot"><span>Blueprint · Made for the build season</span><span>Teams 1810 & 9316</span></footer></div>';
 }
 function authPage(){
  const t=currentTeam();
@@ -326,6 +326,56 @@ app.addEventListener("submit",async ev=>{
   const name=String(f.get("name")||"").trim().slice(0,80),subgroup=String(f.get("subgroup")||"");
   if(!name||!groups.includes(subgroup))return toast("Enter a valid name and subgroup.");
   await requestMembership(state.team,state.user,name,subgroup);await refresh();toast("Access request submitted.");return;
+ }
+ if(form.id==="project-form"){
+  if(!canEdit())return toast("Only team leads can edit projects.");
+  const name=String(f.get("name")||"").trim().slice(0,100);
+  const description=String(f.get("description")||"").trim().slice(0,1500);
+  const subgroup=String(f.get("subgroup")||"");
+  const progressValue=Number(f.get("progress")||0);
+  if(!name||!groups.includes(subgroup)||!Number.isInteger(progressValue)||progressValue<0||progressValue>100)return toast("Check the project fields.");
+  const editing=state.modal==="project-edit";
+  const changes={name,description,subgroup,progress:progressValue};
+  if(state.mode==="demo"){
+   if(editing){
+    const project=state.data.projects.find(x=>String(x.id)===String(state.editingProjectId));
+    if(!project)return;
+    Object.assign(project,changes,{lead:subgroup});
+   }else state.data.projects.push({id:"demo-project-"+Date.now(),...changes,lead:subgroup,icon:"◇"});
+   save(state.team,state.data);
+  }else if(editing)await editLiveProject(state.team,state.editingProjectId,changes);
+  else await addLiveProject(state.team,name,description,subgroup);
+  state.modal=null;state.editingProjectId=null;state.view="projects";
+  if(state.mode==="live")await refresh(true);else render();
+  toast(editing?"Project updated.":"Project created.");return;
+ }
+ if(form.id==="event-form"){
+  if(!canEdit())return toast("Only team leads can schedule events.");
+  const title=String(f.get("title")||"").trim().slice(0,140);
+  const raw=String(f.get("start")||"");
+  const starts=new Date(raw);
+  if(!title||!raw||Number.isNaN(starts.getTime()))return toast("Check the event date and title.");
+  if(state.mode==="demo"){
+   state.data.events.push({id:"demo-event-"+Date.now(),title,starts_at:starts.toISOString(),day:String(starts.getDate()).padStart(2,"0"),month:starts.toLocaleString("en-US",{month:"short"}).toUpperCase(),details:starts.toLocaleString("en-US",{dateStyle:"medium",timeStyle:"short"}),type:"Team"});
+   state.data.events.sort((a,b)=>new Date(a.starts_at||0)-new Date(b.starts_at||0));
+   save(state.team,state.data);
+  }else await addLiveEvent(state.team,title,starts.toISOString(),state.user.id);
+  state.modal=null;state.view="calendar";
+  if(state.mode==="live")await refresh(true);else render();
+  toast("Event scheduled.");return;
+ }
+ if(form.id==="announcement-form"){
+  if(!canEdit())return toast("Only team leads can publish announcements.");
+  const title=String(f.get("title")||"").trim().slice(0,140);
+  const body=String(f.get("body")||"").trim().slice(0,2000);
+  if(!title||!body)return toast("Provide a title and message.");
+  if(state.mode==="demo"){
+   (state.data.announcements||=([])).unshift({id:"demo-announcement-"+Date.now(),title,body,author:"You (preview)",time:"Just now"});
+   save(state.team,state.data);
+  }else await addLiveAnnouncement(state.team,title,body,state.user.id);
+  state.modal=null;state.view="announcements";
+  if(state.mode==="live")await refresh(true);else render();
+  toast("Announcement published.");return;
  }
  if(form.id==="task-form"||form.id==="task-edit-form"){
   if(!canEdit())return toast("Only team leads can manage tasks.");
