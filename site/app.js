@@ -4,6 +4,8 @@ import {avatarColors,avatarColorNames,avatarClass,localDateTime} from "./profile
 import {safeReferenceUrl,reportReasons,fabricationMethods,fabricationStatuses,fabricationLabels,fabricationStatusLabels,engineeringKinds} from "./engineering.js";
 import {inventoryUnits,milestoneStatuses,milestoneLabels,stockCoverage,milestonesFor,milestoneProgress,validQuantity} from "./planning.js";
 import {preparationCategories,preparationLabels,taskPrerequisites,taskBlockers,wouldCreateCycle,eventPreparation,preparationProgress} from "./coordination.js";
+import {patchHtml} from "./dom-patch.js";
+import {installMotion,celebrateTask} from "./motion.js";
 import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,editLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,editLiveEvent,addLiveAnnouncement,getLiveProfile,saveLiveProfile,updateOwnSubgroup,subscribeTeam,reportTeamMessage,reviewTeamReport,setMessageVisibility,createEngineeringLink,deleteEngineeringLink,requestPart,setPartStatus,createInventoryItem,updateInventoryItem,createBomLine,updateBomLine,removeBomLine,createProjectMilestone,updateProjectMilestone,removeProjectMilestone,addTaskDependency,removeTaskDependency,addEventChecklistItem,editEventChecklistItem,setChecklistStatus,deleteEventChecklistItem} from "./supabase.js";
 
 const app=document.getElementById("app");
@@ -67,7 +69,7 @@ function blockerLabel(t){
  return blockers.length?'<small class="dependency-warning">'+icon("info",12)+' Waiting for '+e(blockers.map(x=>x.title).join(", "))+'</small>':"";
 }
 function taskLine(t){
- return '<div class="task"><button class="task-check '+(t.status==="done"?"done":"")+'" data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" '+(canToggle(t)?"":"disabled title=\"Only assignees and leads can update status\"")+'></button><div class="task-body"><b class="'+(t.status==="done"?"strike":"")+'">'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(assignee(t))+' · '+e(t.due)+'</small>'+blockerLabel(t)+'</div>'+pill(t.status)+'</div>';
+ return '<div class="task" data-dom-key="overview-task-'+e(t.id)+'"><button class="task-check '+(t.status==="done"?"done":"")+'" data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" '+(canToggle(t)?"":"disabled title=\"Only assignees and leads can update status\"")+'></button><div class="task-body"><b class="'+(t.status==="done"?"strike":"")+'">'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(assignee(t))+' · '+e(t.due)+'</small>'+blockerLabel(t)+'</div>'+pill(t.status)+'</div>';
 }
 function renderOverview(){
  const d=state.data;
@@ -117,7 +119,10 @@ function renderOverview(){
  // unused block below the left column on teams with little activity.
  return heading(
   "TEAM WORKSPACE","A clearer way to build.","Your projects, people, and progress in one place.",
-  '<span class="demo-label">'+(state.mode==="demo"?"DEMO WORKSPACE":"CONNECTED WORKSPACE")+'</span>'
+  '<span class="demo-label">'+(state.mode==="demo"?"DEMO WORKSPACE":"CONNECTED WORKSPACE")+'</span>'+
+  '<button type="button" class="blueprint-orbit" data-orbit-pulse title="Move your pointer nearby or click" aria-label="Pulse the interactive Blueprint compass">'+
+  '<span class="orbit-rim" aria-hidden="true"></span><span class="orbit-axis" aria-hidden="true"></span>'+
+  '<span class="orbit-center" aria-hidden="true"></span><span class="orbit-caption" aria-hidden="true">BP / 01</span></button>'
  )+sampleNote()+'<div class="stats">'+statHtml+'</div>'+
  '<div class="overview-grid">'+priorities+season+activity+calendar+teamNotices+digest+'</div>';
 }
@@ -132,7 +137,7 @@ function renderTasks(){
  const entries=tasks.map(t=>{
   const prereqs=taskPrerequisites(t.id,state.data.taskDependencies||[],state.data.tasks);
   const dependencyDetail=prereqs.length?'<small class="prereq-detail">Depends on: '+e(prereqs.map(x=>x.title+(x.status==="done"?" ✓":"")).join(", "))+'</small>':"";
-  return '<div class="card entry"><button type="button" data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" class="task-check '+(t.status==="done"?"done":"")+'" '+(canToggle(t)?"":'disabled title="Complete prerequisites or request a Lead"')+'></button>'+
+  return '<div class="card entry" data-dom-key="task-'+e(t.id)+'"><button type="button" data-toggle="'+e(t.id)+'" aria-label="Toggle '+e(t.title)+'" class="task-check '+(t.status==="done"?"done":"")+'" '+(canToggle(t)?"":'disabled title="Complete prerequisites or request a Lead"')+'></button>'+
   '<div class="entry-main"><b>'+e(t.title)+'</b><small>'+e(t.subgroup)+' · '+e(assignee(t))+' · Due '+e(t.due)+' · '+e(t.priority)+' priority</small>'+blockerLabel(t)+dependencyDetail+'</div>'+
   pill(t.status)+(allowed?'<div class="entry-actions"><button type="button" class="btn small" data-edit-task="'+e(t.id)+'">'+icon("pencil",13)+' Edit</button>'+
   '<button type="button" class="btn small" data-add-dependency="'+e(t.id)+'">Prerequisites</button></div>':"")+'</div>';
@@ -236,11 +241,11 @@ function renderCalendar(){
   const summary=preparationProgress(items);
   const checklist=items.map(item=>{
    const assigned=state.data.people.find(p=>p.id===item.assigned_to)?.name||"Unassigned";
-   return '<div class="event-checklist-item"><button type="button" data-checklist-toggle="'+e(item.id)+'" aria-label="Toggle '+e(item.title)+'" class="task-check '+(item.status==="done"?"done":"")+'" '+(canToggleChecklist(item)?"":'disabled title="Assigned teammate or Lead only"')+'></button>'+
+   return '<div class="event-checklist-item" data-dom-key="checklist-'+e(item.id)+'"><button type="button" data-checklist-toggle="'+e(item.id)+'" aria-label="Toggle '+e(item.title)+'" class="task-check '+(item.status==="done"?"done":"")+'" '+(canToggleChecklist(item)?"":'disabled title="Assigned teammate or Lead only"')+'></button>'+
     '<div><b class="'+(item.status==="done"?"strike":"")+'">'+e(item.title)+'</b><small>'+e(preparationLabels[item.category]||"Other")+' · '+e(assigned)+'</small></div>'+
     (canEdit()?'<button type="button" class="subtle-action" data-edit-checklist="'+e(item.id)+'">Edit</button>':"")+'</div>';
   }).join("");
-  return '<article class="card calendar-prep-card"><div class="calendar-event-head"><div class="event-date"><b>'+e(ev.day)+'</b><small>'+e(ev.month)+'</small></div>'+
+  return '<article class="card calendar-prep-card" data-dom-key="event-'+e(ev.id)+'"><div class="calendar-event-head"><div class="event-date"><b>'+e(ev.day)+'</b><small>'+e(ev.month)+'</small></div>'+
     '<div class="event-info"><b>'+e(ev.title)+'</b><small>'+e(ev.details)+(ev.edited_at?' · Updated by '+e(ev.edited_by||"Team lead"):"")+'</small></div>'+
     (canEdit()?'<button type="button" class="btn small record-edit" data-edit-event="'+e(ev.id)+'">'+icon("pencil",13)+' Edit event</button>':"")+'</div>'+
     '<div class="event-prep"><div class="planning-panel-heading"><b>EVENT PREPARATION</b><span>'+summary.done+' of '+summary.total+' ready</span></div>'+
@@ -365,7 +370,7 @@ function sidebar(){
 function shell(){
  const views={overview:renderOverview,announcements:renderAnnouncements,tasks:renderTasks,logs:renderLogs,projects:renderProjects,messages:renderMessages,calendar:renderCalendar,people:renderPeople,admin:renderAdmin,safety:renderSafety,manufacturing:renderManufacturing,inventory:renderInventory,profile:renderProfile,settings:renderSettings};
  const labels={overview:"Overview",announcements:"Announcements",tasks:"Tasks",logs:"Build log",projects:"Robot projects",messages:"Messages",calendar:"Calendar",people:"Members",admin:"Membership",safety:"Moderation",manufacturing:"Manufacturing",inventory:"Inventory",profile:"My profile",settings:"Settings"};
- return '<div class="shell">'+sidebar()+'<main class="main"><div class="bar"><div class="actions"><button class="round-button mobile-toggle" data-action="menu" aria-label="Open menu">'+icon("menu")+'</button><div class="crumb">Team '+e(state.team)+' <span>/</span> '+labels[state.view]+'</div></div><div class="bar-right"><span class="eyebrow" style="letter-spacing:.8px">'+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+'</span><button class="round-button" aria-label="Refresh workspace" data-action="refresh-live" title="Refresh workspace">↻</button><button class="round-button" aria-label="Notifications" data-action="notifications">'+icon("bell")+'</button><span class="bar-avatar">'+(state.mode==="demo"?"BP":"TM")+'</span></div></div>'+previewBanner()+'<div class="content enter">'+(views[state.view]||renderOverview)()+'</div></main></div>';
+ return '<div class="shell">'+sidebar()+'<main class="main"><div class="bar"><div class="actions"><button class="round-button mobile-toggle" data-action="menu" aria-label="Open menu">'+icon("menu")+'</button><div class="crumb">Team '+e(state.team)+' <span>/</span> '+labels[state.view]+'</div></div><div class="bar-right"><span class="eyebrow" style="letter-spacing:.8px">'+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+'</span><button class="round-button" aria-label="Refresh workspace" data-action="refresh-live" title="Refresh workspace">↻</button><button class="round-button" aria-label="Notifications" data-action="notifications">'+icon("bell")+'</button><span class="bar-avatar">'+(state.mode==="demo"?"BP":"TM")+'</span></div></div>'+previewBanner()+'<div class="content enter" data-dom-key="view-'+e(state.view)+'">'+(views[state.view]||renderOverview)()+'</div></main></div>';
 }
 function landing(){
  return '<div class="landing"><div class="landing-top"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><small>ROBOTICS TEAM MANAGEMENT</small></div><main class="landing-inner enter"><span class="eyebrow">THE WORK BEHIND THE ROBOT</span><h1>A better place<br>to <em>build together.</em></h1><p class="landing-intro">Tasks, conversations, engineering logs and team progress. Organized around the people actually building the robot.</p><div class="team-choices">'+teams.map(t=>'<button class="team-choice" data-team="'+t.id+'"><strong>'+t.id+'</strong><span>'+e(t.name)+'</span><small>'+(state.mode==="demo"?"OPEN PREVIEW":"CONTINUE TO SIGN IN")+' &nbsp; →</small></button>').join("")+'</div><div style="margin-top:18px"><span class="demo-label">'+(state.mode==="demo"?"PREVIEW MODE · SAMPLE DATA":"PRIVATE TEAM ACCESS")+'</span></div></main><footer class="landing-foot"><span>Blueprint · Made for the build season</span><span>Teams 1810 & 9316</span></footer></div>';
@@ -598,12 +603,13 @@ function render(){
  const previousMain=app.querySelector?.(".main");
  const previousTop=previousMain?.scrollTop||0;
  const sameView=state.renderScrollKey===scrollKey;
- app.innerHTML=shell()+modal();
+ const markup=shell()+modal();
+ // Reconcile the existing shell for menus, saves and incoming realtime changes.
+ // Minimal non-browser test environments continue to use the legacy fallback.
+ if(!patchHtml(app,markup))app.innerHTML=markup;
  state.renderScrollKey=scrollKey;
- if(sameView){
-  const nextMain=app.querySelector?.(".main");
-  if(nextMain)nextMain.scrollTop=previousTop;
- }
+ const nextMain=app.querySelector?.(".main");
+ if(nextMain)nextMain.scrollTop=sameView?previousTop:0;
 }
 function toast(text){
  document.querySelector(".toast")?.remove();
@@ -622,7 +628,9 @@ async function refresh(quiet=false){
  state.refreshBusy=true;
  const previousDraft=quiet?document.querySelector("#compose-form input")?.value:null;
  const requestedTeam=state.team;
- if(!quiet){state.loading=true;render();}
+ // Keep the current workspace visible during saves and refreshes.
+ // Only first-time loading needs the full-screen state.
+ if(!quiet&&!state.data){state.loading=true;render();}
  try{
   const user=await getUser();
   if(state.team!==requestedTeam)return;
@@ -814,6 +822,7 @@ app.addEventListener("click",async ev=>{
   try{
    if(state.mode==="demo"){item.status=status;save(state.team,state.data);render();}
    else{await setChecklistStatus(state.team,item.id,status);await refresh(true);}
+   if(status==="done")celebrateTask(app,item.id,true);
    toast(status==="done"?"Checklist item completed.":"Checklist item reopened.");
   }catch(err){toast("Checklist update rejected: "+(err.message||"Unknown error"));}
   return;
@@ -880,8 +889,16 @@ app.addEventListener("click",async ev=>{
  if(toggle){
   const task=state.data?.tasks.find(t=>String(t.id)===toggle.dataset.toggle);if(!task)return;if(!canToggle(task))return toast("Only an assigned member or lead can change this task.");
   const status=task.status==="done"?"todo":"done";
-  if(state.mode==="demo"){task.status=status;save(state.team,state.data);render();}
-  else{try{await setLiveTaskStatus(state.team,task.id,status);await refresh();}catch(err){toast("Update rejected: "+err.message);}}
+  if(state.mode==="demo"){
+   task.status=status;save(state.team,state.data);render();
+   if(status==="done")celebrateTask(app,task.id);
+  }else{
+   try{
+    await setLiveTaskStatus(state.team,task.id,status);
+    await refresh(true);
+    if(status==="done")celebrateTask(app,task.id);
+   }catch(err){toast("Update rejected: "+err.message);}
+  }
   return;
  }
  const button=ev.target.closest("[data-action]");
@@ -1242,4 +1259,5 @@ app.addEventListener("submit",async ev=>{
  }catch(err){toast("Could not save: "+(err.message||"Unknown error"));}
 });
 document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&state.modal){state.modal=null;render();}});
+installMotion(app);
 if(state.team)refresh();else render();
