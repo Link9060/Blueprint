@@ -23,8 +23,9 @@ jobs:
           node --check site/data.js
           node --check site/supabase.js
           node --check site/config.js
+          node --check site/roles.js
       - name: Test workspace data boundaries
-        run: node --test tests/data.test.mjs tests/render.test.mjs
+        run: node --test tests/data.test.mjs tests/render.test.mjs tests/roles.test.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

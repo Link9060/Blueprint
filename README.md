@@ -10,6 +10,8 @@ A focused, quietly designed workspace for FRC robotics teams **1810** and **9316
 - Private team selection and role-aware member access
 - Google sign-in integration (requires Google OAuth provider setup) and email magic-link option (requires redirect allowlisting)
 - New memberships start **pending** until a trusted team administrator approves them
+- Protected **Owner** role above Admin, provisioned only through verified trusted administration
+- Visual-only **role inspector** for Owner and demo, switching among Admin, Captain, Mentor, Lead, and Member
 - Team dashboards with tasks, owners, priorities, statuses, due dates and progress
 - Build logs and subsystem project creation/editing
 - Team announcements, meeting and event scheduling
@@ -43,7 +45,7 @@ These tests do **not** replace real-browser tests, real Google/email provider ve
 
 ## Next milestones
 
-1. Complete Supabase authentication URL configuration and Google provider credentials.
+1. Configure Google OAuth credentials and Supabase Auth redirects, then bootstrap a verified Owner.
 2. Bootstrap first authorized administrator per team, then test pending/approved cross-team access with separate accounts.
 3. Add message reporting and moderation, administrative audit history, and account-access recovery before widespread student onboarding.
 4. Add CAD/file linking, manufacturing requests, inventory and competition preparation.

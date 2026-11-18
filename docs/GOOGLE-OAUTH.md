@@ -1,18 +1,36 @@
-# Blueprint Google sign-in
+# Google sign-in for Blueprint
 
-Blueprint uses its **dedicated** project [Resonant. Blueprint](https://supabase.com/dashboard/project/weaytuxrcanwdbpcmlce). Do not reuse Relay's OAuth secret.
+The website already contains the **Continue with Google** button, but Google OAuth cannot finish until an authorized Google Cloud/Supabase administrator supplies client credentials in their dashboards.
 
-## One-time owner/mentor steps
+## Exact URLs
 
-1. In the Blueprint [Supabase Auth providers](https://supabase.com/dashboard/project/weaytuxrcanwdbpcmlce/auth/providers), open **Google** and note its exact Supabase callback URL.
-2. In a Google Cloud project controlled by an authorized team/school administrator, configure an OAuth consent screen and a **Web application** OAuth client. If required, the school's Google Workspace admin must approve the app.
-3. Add the exact Supabase callback URL as an **authorized redirect URI** in Google Cloud. This is **not** the GitHub Pages URL.
-4. Save the Google **client ID** and **client secret** in the Supabase Google provider configuration. Do not put the secret in `site/config.js`, GitHub, or a public webpage.
-5. In [Supabase Auth URL configuration](https://supabase.com/dashboard/project/weaytuxrcanwdbpcmlce/auth/url-configuration), use `https://link9060.github.io/Blueprint/` as Site URL and as an allowed Redirect URL.
-6. Test with an approved, non-admin test account, then with a pending member.
+**Supabase Site URL and allowed app Redirect URL:**
+```text
+https://link9060.github.io/Blueprint/
+```
 
-The frontend's **Continue with Google** button is already coded, but the provider cannot be activated through the currently connected database/GitHub tools. Only the authorized dashboard owner can complete the OAuth credential setup.
+**Google Cloud Authorized JavaScript origins:**
+```text
+https://link9060.github.io
+```
 
-For initial testing without Google, the frontend also offers an email sign-in link. It likewise requires the correct Site URL and redirect allowlist.
+**Google Cloud Authorized redirect URI:**
+```text
+https://weaytuxrcanwdbpcmlce.supabase.co/auth/v1/callback
+```
 
-**Privacy:** Google sign-in proves a Google account controls an identity; it does not grant team membership. Every new account remains pending until an approved administrator verifies and authorizes it.
+Verify the redirect callback shown on the Supabase provider configuration screen before using it.
+
+## One-time steps
+
+1. Open [Google Auth Platform → Audience](https://console.cloud.google.com/auth/audience) and set up an authorized consent screen and test audience. School-managed accounts may require Workspace administrator approval.
+2. Open [Google Auth Platform → Clients](https://console.cloud.google.com/auth/clients) and create an OAuth client ID of type **Web application**. Enter the JavaScript origin and redirect URI above in their respective fields.
+3. Enter the generated **Client ID and Client Secret directly into the [Blueprint Supabase Google provider](https://supabase.com/dashboard/project/weaytuxrcanwdbpcmlce/auth/providers?provider=Google)**. Enable and save the provider.
+4. In [Supabase Auth → URL Configuration](https://supabase.com/dashboard/project/weaytuxrcanwdbpcmlce/auth/url-configuration), set the Site URL and allowed Redirect URL to the Blueprint website address above.
+5. Visit https://link9060.github.io/Blueprint/, select your team, and click **Continue with Google**. It should return to Blueprint and show the membership-request screen.
+6. Complete the verified first Owner bootstrap described in [SETUP.md](./SETUP.md). Google authentication does not automatically grant team access.
+7. Have separate test users sign in and request access. Every new member must remain pending until approved.
+
+Never put the Google Client Secret into GitHub, a public JavaScript file, or this conversation. Use a school-approved Google Cloud account and do not bypass school account restrictions.
+
+Google provider reference: https://supabase.com/docs/guides/auth/social-sign-in/auth-google
