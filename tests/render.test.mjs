@@ -86,6 +86,38 @@ test("landing and sample workspace views render without browser dependencies", a
  assert.ok(html.includes("Robot CAD designer"));
  assert.ok(html.includes("avatar-sage"));
 
+ // Engineering and safety features use fictional local preview data.
+ await handlers.click({target:fakeTarget("[data-view]","view","projects")});
+ assert.ok(html.includes("ENGINEERING REFERENCES"));
+ assert.ok(html.includes('data-add-reference="demo-1810-project-0"'));
+ await handlers.click({target:fakeTarget("[data-add-reference]","addReference","demo-1810-project-0")});
+ assert.ok(html.includes('id="reference-form"'));
+ await handlers.submit({target:{id:"reference-form",values:{
+  title:"Intake CAD rev 4",url:"https://example.org/cad/v4",kind:"cad"
+ }},preventDefault(){}});
+ assert.ok(html.includes("Intake CAD rev 4"));
+ await handlers.click({target:fakeTarget("[data-view]","view","manufacturing")});
+ assert.ok(html.includes("Manufacturing requests"));
+ await handlers.click(action("new-part"));
+ assert.ok(html.includes('id="part-form"'));
+ await handlers.submit({target:{id:"part-form",values:{
+  part_name:"Mock elevator bracket",quantity:"2",method:"3d_print",
+  project_id:"demo-1810-project-0",notes:"Fictional fit check"
+ }},preventDefault(){}});
+ assert.ok(html.includes("Mock elevator bracket"));
+ assert.ok(html.includes('data-part-status='));
+ await handlers.click({target:fakeTarget("[data-view]","view","messages")});
+ assert.ok(html.includes('data-report-message="demo-1810-general-0"'));
+ await handlers.click({target:fakeTarget("[data-report-message]","reportMessage","demo-1810-general-0")});
+ assert.ok(html.includes('id="report-form"'));
+ await handlers.submit({target:{id:"report-form",values:{
+  reason:"other",note:"Please check fictional message"
+ }},preventDefault(){}});
+ await handlers.click({target:fakeTarget("[data-view]","view","safety")});
+ assert.ok(html.includes("Moderation &amp; activity"));
+ assert.ok(html.includes("Please check fictional message"));
+ assert.ok(html.includes('data-review-report='));
+
  // The role inspector must hide admin tools in the Member view and never grant
  // or change server-side permissions.
  const selectRole=role=>({
