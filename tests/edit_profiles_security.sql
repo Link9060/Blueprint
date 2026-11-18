@@ -29,6 +29,34 @@ begin
  end if;
 end $$;
 
+-- A real Lead (not just a Captain) may edit an entry created by another lead.
+reset role;
+select set_config('request.jwt.claim.sub','',false);
+insert into auth.users(id) values ('00000000-0000-4000-8000-000000000009');
+insert into public.profiles(id,full_name) values
+ ('00000000-0000-4000-8000-000000000009','Lead Fixture');
+insert into public.team_memberships(team_id,user_id,role,subgroup,status)
+ values ('1810','00000000-0000-4000-8000-000000000009','lead','Design','approved');
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000009',false);
+update public.build_logs set title='Reviewed by Lead'
+ where id='00000000-0000-4000-8000-000000000110';
+update public.events set title='Lead review scheduled'
+ where id='00000000-0000-4000-8000-000000000111';
+do $
+begin
+ if not exists(select 1 from public.build_logs
+  where id='00000000-0000-4000-8000-000000000110'
+    and title='Reviewed by Lead' and edited_by=(select auth.uid())) then
+  raise exception 'Lead cannot edit a teammate build log';
+ end if;
+ if not exists(select 1 from public.events
+  where id='00000000-0000-4000-8000-000000000111'
+    and title='Lead review scheduled' and edited_by=(select auth.uid())) then
+  raise exception 'Lead cannot edit a teammate event';
+ end if;
+end $;
+
 -- Ordinary member cannot edit team engineering records, but can edit own profile.
 select set_config('request.jwt.claim.sub','00000000-0000-4000-8000-000000000003',false);
 do $$

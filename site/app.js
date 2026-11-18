@@ -173,7 +173,7 @@ function renderMessages(){
 function renderProfile(){
  const p=currentProfile();
  const name=p.full_name||state.user?.user_metadata?.full_name||"Team member";
- const subgroup=state.mode==="demo"?"Design":state.member?.subgroup||"Design";
+ const subgroup=state.mode==="demo"?(p.subgroup||"Design"):(state.member?.subgroup||"Design");
  const colors=avatarColors.map(c=>
   '<label class="profile-swatch '+((p.avatar_color||"slate")===c?"selected":"")+'"><input type="radio" name="avatar_color" value="'+c+'" '+((p.avatar_color||"slate")===c?"checked":"")+'>'+
   '<span class="profile-swatch-dot '+avatarClass(c)+'" aria-hidden="true"></span><small>'+avatarColorNames[c]+'</small></label>'
@@ -495,7 +495,7 @@ app.addEventListener("submit",async ev=>{
   }
   const fields={full_name,headline,bio,avatar_color};
   if(state.mode==="demo"){
-   state.data.profile=fields;
+   state.data.profile={...fields,subgroup};
    save(state.team,state.data);
    render();
   }else{

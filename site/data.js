@@ -81,7 +81,7 @@ function make(team){
  const tasks=base.tasks.map((t,i)=>({...t,assigned_to:i<3?people[i%people.length]?.id:null,priority:t.priority||"Normal",due_date:""}));
  const projects=base.projects.map((p,i)=>({...p,id:"demo-"+team+"-project-"+i,subgroup:p.lead}));
  const pending=[{user_id:"demo-pending-"+team,name:"Jamie L.",subgroup:"Design",role:"member",status:"pending"}];
- return {team,name:base.name,tasks,projects,logs:base.logs,people,pending,profile:{full_name:"Preview User",headline:"Building our next robot",bio:"Use this fictional profile to explore the editor.",avatar_color:"blue"},events:clone(commonEvents).map((ev,i)=>({...ev,id:"demo-"+team+"-event-"+i,starts_at:new Date(new Date().getFullYear(),10,Number(ev.day),[15,16,15][i],[30,0,45][i]).toISOString()})),messages:clone(initialMessages)};
+ return {team,name:base.name,tasks,projects,logs:base.logs,people,pending,profile:{full_name:"Preview User",headline:"Building our next robot",bio:"Use this fictional profile to explore the editor.",avatar_color:"blue",subgroup:"Design"},events:clone(commonEvents).map((ev,i)=>({...ev,id:"demo-"+team+"-event-"+i,starts_at:new Date(new Date().getFullYear(),10,Number(ev.day),[15,16,15][i],[30,0,45][i]).toISOString()})),messages:clone(initialMessages)};
 }
 export const teams=[{id:"1810",name:"CATATRONICS"},{id:"9316",name:"CUBATRONICS"}];
 export const groups=["Design","Mechanical","Manufacturing","Electrical","Programming","Strategy","Business"];
