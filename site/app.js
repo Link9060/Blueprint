@@ -424,6 +424,63 @@ function modal(){
    engineeringKinds.map(k=>'<option value="'+k+'">'+e(k[0].toUpperCase()+k.slice(1))+'</option>').join("")+'</select></div>'+
    '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button>'+
    '<button type="submit" class="btn primary">Attach reference</button></div></form>';
+ }else if(state.modal==="stock"||state.modal==="stock-edit"){
+  const editing=state.modal==="stock-edit";
+  const item=editing?state.data.inventory.find(x=>String(x.id)===String(state.editingStockId)):null;
+  if(editing&&!item)return "";
+  title=editing?"Edit catalog stock":"Add inventory item";
+  description="Recorded quantities are manually maintained by team leads. Do not include supplier account credentials.";
+  body='<form id="stock-form">'+
+   '<div class="form-duo"><div class="form-group"><label for="stock-name">Part or material</label>'+
+   '<input id="stock-name" name="name" class="field" maxlength="120" required value="'+e(item?.name||"")+'" placeholder="e.g. M5 socket head bolt"></div>'+
+   '<div class="form-group"><label for="stock-sku">Part number / SKU</label>'+
+   '<input id="stock-sku" name="sku" class="field" maxlength="80" value="'+e(item?.sku||"")+'" placeholder="Optional identifier"></div></div>'+
+   '<div class="form-duo"><div class="form-group"><label for="stock-qty">On hand</label>'+
+   '<input id="stock-qty" name="quantity_on_hand" class="field" type="number" min="0" max="1000000" step="1" required value="'+e(item?.quantity_on_hand??0)+'"></div>'+
+   '<div class="form-group"><label for="stock-reorder">Reorder at or below</label>'+
+   '<input id="stock-reorder" name="reorder_at" class="field" type="number" min="0" max="1000000" step="1" required value="'+e(item?.reorder_at??0)+'"></div></div>'+
+   '<div class="form-duo"><div class="form-group"><label for="stock-unit">Unit</label><select class="field" id="stock-unit" name="unit">'+
+   inventoryUnits.map(x=>'<option value="'+x+'" '+((item?.unit||"each")===x?"selected":"")+'>'+e(x)+'</option>').join("")+'</select></div>'+
+   '<div class="form-group"><label for="stock-location">Storage location</label>'+
+   '<input id="stock-location" class="field" name="storage_location" maxlength="120" value="'+e(item?.storage_location||"")+'" placeholder="Drawer, shelf or bin"></div></div>'+
+   '<div class="form-group"><label for="stock-notes">Notes</label>'+
+   '<textarea id="stock-notes" class="field" name="notes" maxlength="1000" placeholder="Specifications, supplier part number or storage guidance">'+e(item?.notes||"")+'</textarea></div>'+
+   '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button>'+
+   '<button type="submit" class="btn primary">'+(editing?"Save stock":"Add catalog item")+'</button></div></form>';
+ }else if(state.modal==="bom"||state.modal==="bom-edit"){
+  const editing=state.modal==="bom-edit";
+  const line=editing?state.data.bom.find(x=>String(x.id)===String(state.editingBomId)):null;
+  if(editing&&!line)return "";
+  title=editing?"Edit bill of materials":"Add BOM requirement";
+  description="Link stock from the team catalog to this project. Demand is aggregated across all project BOMs.";
+  const inventoryOptions=state.data.inventory.map(x=>
+   '<option value="'+e(x.id)+'" '+((line?.inventory_id||"")===x.id?"selected":"")+'>'+e(x.name)+' · '+e(x.unit)+'</option>'
+  ).join("");
+  body='<form id="bom-form"><div class="form-group"><label for="bom-stock">Inventory item</label>'+
+   (editing?'<input name="inventory_id" type="hidden" value="'+e(line.inventory_id)+'"><div class="field planning-readonly">'+e(state.data.inventory.find(x=>x.id===line.inventory_id)?.name||"Catalog item")+'</div>':
+   '<select id="bom-stock" class="field" name="inventory_id" required><option value="">Choose stock</option>'+inventoryOptions+'</select>')+'</div>'+
+   '<div class="form-group"><label for="bom-qty">Quantity required</label>'+
+   '<input id="bom-qty" type="number" class="field" name="quantity_required" min="1" max="1000000" step="1" required value="'+e(line?.quantity_required??1)+'"></div>'+
+   '<div class="form-group"><label for="bom-notes">Requirement notes</label>'+
+   '<textarea id="bom-notes" class="field" name="notes" maxlength="500" placeholder="Dimensions, fit requirements, revision notes">'+e(line?.notes||"")+'</textarea></div>'+
+   '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button>'+
+   '<button type="submit" class="btn primary">'+(editing?"Update requirement":"Add to BOM")+'</button></div></form>';
+ }else if(state.modal==="milestone"||state.modal==="milestone-edit"){
+  const editing=state.modal==="milestone-edit";
+  const milestone=editing?state.data.milestones.find(x=>String(x.id)===String(state.editingMilestoneId)):null;
+  if(editing&&!milestone)return "";
+  title=editing?"Edit project milestone":"Add project milestone";
+  description="Plan design reviews, assembly checkpoints and tests for this robot project.";
+  body='<form id="milestone-form"><div class="form-group"><label for="milestone-title">Milestone title</label>'+
+   '<input id="milestone-title" class="field" name="title" maxlength="140" required value="'+e(milestone?.title||"")+'" placeholder="e.g. Confirm first prototype fit"></div>'+
+   '<div class="form-duo"><div class="form-group"><label for="milestone-due">Target date</label>'+
+   '<input id="milestone-due" type="date" class="field" name="due_on" value="'+e(milestone?.due_on||"")+'"></div>'+
+   '<div class="form-group"><label for="milestone-status">Status</label><select id="milestone-status" name="status" class="field">'+
+   milestoneStatuses.map(x=>'<option value="'+x+'" '+((milestone?.status||"planned")===x?"selected":"")+'>'+e(milestoneLabels[x])+'</option>').join("")+'</select></div></div>'+
+   '<div class="form-group"><label for="milestone-notes">Notes / acceptance criteria</label>'+
+   '<textarea id="milestone-notes" class="field" name="notes" maxlength="800" placeholder="What must be verified before marking this done?">'+e(milestone?.notes||"")+'</textarea></div>'+
+   '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button>'+
+   '<button type="submit" class="btn primary">'+(editing?"Save milestone":"Create milestone")+'</button></div></form>';
  }else if(state.modal==="part"){
   title="Request manufacturing work";
   description="Submit a part for review. A team Lead or higher will control its progress.";
