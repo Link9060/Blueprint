@@ -265,6 +265,8 @@ app.addEventListener("click",async ev=>{
  const scope=ev.target.closest("[data-task-scope]");if(scope){state.taskScope=scope.dataset.taskScope;render();return;}
  const channel=ev.target.closest("[data-channel]");if(channel){state.channel=channel.dataset.channel;render();return;}
  const edit=ev.target.closest("[data-edit-task]");if(edit&&canEdit()){state.editingTaskId=edit.dataset.editTask;state.modal="task-edit";render();return;}
+ const project=ev.target.closest("[data-edit-project]");
+ if(project&&canEdit()){state.editingProjectId=project.dataset.editProject;state.modal="project-edit";render();return;}
  const decision=ev.target.closest("[data-decision]");
  if(decision){
   if(!canAdmin())return;
@@ -297,10 +299,29 @@ app.addEventListener("click",async ev=>{
  const button=ev.target.closest("[data-action]");
  if(button){await dispatchAction(button.dataset.action);}
 });
+app.addEventListener("change",async ev=>{
+ const target=ev.target.closest("[data-role-change]");
+ if(!target||!canAdmin())return;
+ const id=target.dataset.roleChange,role=target.value;
+ if(!["member","lead","captain","mentor","admin"].includes(role)||id===state.user?.id)return;
+ try{
+  if(state.mode==="demo"){
+   const person=state.data.people.find(x=>x.id===id);
+   if(person){person.role=role;save(state.team,state.data);render();}
+  }else{await updateMemberRole(state.team,id,role);await refresh(true);}
+  toast("Member role updated.");
+ }catch(err){toast("Role update failed: "+(err.message||"Unknown error"));await refresh(true);}
+});
 app.addEventListener("submit",async ev=>{
- const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form"].includes(form.id))return;
+ const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form"].includes(form.id))return;
  ev.preventDefault();const f=new FormData(form);
  try{
+ if(form.id==="magic-link-form"){
+  const email=String(f.get("email")||"").trim();
+  await sendMagicLink(email);
+  state.authNotice="Check your inbox for the secure sign-in link. Open it in this browser to return to Blueprint.";
+  render();return;
+ }
  if(form.id==="request-form"){
   const name=String(f.get("name")||"").trim().slice(0,80),subgroup=String(f.get("subgroup")||"");
   if(!name||!groups.includes(subgroup))return toast("Enter a valid name and subgroup.");
