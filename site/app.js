@@ -477,7 +477,7 @@ async function chooseTeam(team){
 }
 async function dispatchAction(action){
  if(action==="end-role-preview"){state.rolePreview=null;state.modal=null;render();return;}
- if(previewReadOnly()&&["new-task","new-log","new-project","new-event","new-announcement","reset"].includes(action))return toast("Role preview is read-only. Exit preview to make changes.");
+ if(previewReadOnly()&&["new-task","new-log","new-project","new-event","new-announcement","new-part","reset"].includes(action))return toast("Role preview is read-only. Exit preview to make changes.");
  if(action==="switch-team"||action==="sign-out"||action==="exit-preview"){
   stopLiveUpdates();state.rolePreview=null;
   if(action==="sign-out"&&state.mode==="live"){try{await signOut();}catch(err){toast(err.message);}}
@@ -499,6 +499,7 @@ async function dispatchAction(action){
  if(action==="new-project"){if(!canEdit())return;state.editingProjectId=null;state.modal="project";render();return;}
  if(action==="new-event"){if(!canEdit())return;state.editingEventId=null;state.modal="event";render();return;}
  if(action==="new-announcement"){if(!canEdit())return;state.modal="announcement";render();return;}
+ if(action==="new-part"){state.modal="part";render();return;}
  if(action==="open-profile"){state.view="profile";state.menu=false;state.modal=null;render();return;}
  if(action==="notifications"){state.modal="notifications";render();return;}
  if(action==="close-modal"){state.modal=null;render();return;}
@@ -565,7 +566,7 @@ app.addEventListener("change",async ev=>{
   const next=roleSelection.value;
   state.rolePreview=roleIsPreviewable(next)?next:null;
   state.modal=null;
-  if(!canAdmin()&&state.view==="admin")state.view="overview";
+  if(!canAdmin()&&["admin","safety"].includes(state.view))state.view="overview";
   render();return;
  }
  if(previewReadOnly())return toast("Exit role preview before modifying member access.");
