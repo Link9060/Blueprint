@@ -45,9 +45,17 @@ export function installMotion(root){
    const rect=orb.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
    const dx=point.x-cx,dy=point.y-cy,dist=Math.hypot(dx,dy);
    const proximity=Math.max(0,1-dist/340);
+   const x=Math.max(-16,Math.min(16,dx*.045))*proximity;
+   const y=Math.max(-16,Math.min(16,dy*.045))*proximity;
    orb.style.setProperty("--orbit-near",proximity.toFixed(3));
-   orb.style.setProperty("--orbit-x",(Math.max(-16,Math.min(16,dx*.045))*proximity).toFixed(2)+"px");
-   orb.style.setProperty("--orbit-y",(Math.max(-16,Math.min(16,dy*.045))*proximity).toFixed(2)+"px");
+   orb.style.setProperty("--orbit-x",x.toFixed(2)+"px");
+   orb.style.setProperty("--orbit-y",y.toFixed(2)+"px");
+   orb.style.setProperty("--orbit-rim-x",(x*.38).toFixed(2)+"px");
+   orb.style.setProperty("--orbit-rim-y",(y*.38).toFixed(2)+"px");
+   orb.style.setProperty("--orbit-axis-x",(x*.65).toFixed(2)+"px");
+   orb.style.setProperty("--orbit-axis-y",(y*.65).toFixed(2)+"px");
+   orb.style.setProperty("--orbit-scale",(1+proximity*.24).toFixed(3));
+   orb.style.setProperty("--orbit-opacity",(.56+proximity*.38).toFixed(3));
   }
  }
  function move(event){
@@ -63,6 +71,12 @@ export function installMotion(root){
    orb.style.setProperty("--orbit-near","0");
    orb.style.setProperty("--orbit-x","0px");
    orb.style.setProperty("--orbit-y","0px");
+   orb.style.setProperty("--orbit-rim-x","0px");
+   orb.style.setProperty("--orbit-rim-y","0px");
+   orb.style.setProperty("--orbit-axis-x","0px");
+   orb.style.setProperty("--orbit-axis-y","0px");
+   orb.style.setProperty("--orbit-scale","1");
+   orb.style.setProperty("--orbit-opacity",".56");
   }
  }
  function click(event){
