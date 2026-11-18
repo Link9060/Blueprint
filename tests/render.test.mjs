@@ -8,10 +8,12 @@ test("landing and sample workspace views render without browser dependencies", a
  globalThis.window={ BLUEPRINT_CONFIG:{supabaseUrl:"",supabasePublishableKey:""} };
  globalThis.localStorage={getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)};
  globalThis.sessionStorage={getItem:()=>null,setItem:()=>{},removeItem:()=>{}};
+ let mainViewport={scrollTop:0};
  const root={
   addEventListener:(name,fn)=>handlers[name]=fn,
   get innerHTML(){return html;},
-  set innerHTML(value){html=String(value);}
+  set innerHTML(value){html=String(value);mainViewport={scrollTop:0};},
+  querySelector:(selector)=>selector===".main"&&html.includes('class="shell"')?mainViewport:null
  };
  globalThis.document={
   getElementById:id=>id==="app"?root:null,
@@ -70,6 +72,14 @@ test("landing and sample workspace views render without browser dependencies", a
  assert.ok(html.includes('data-view="admin"'));
  await handlers.change({target:selectRole("actual")});
  assert.ok(!html.includes("Viewing as Admin"));
+
+ // Editing a card or opening a modal should not jump the workspace to the top.
+ await handlers.click({target:fakeTarget("[data-view]","view","overview")});
+ root.querySelector(".main").scrollTop=280;
+ await handlers.click(action("notifications"));
+ assert.equal(root.querySelector(".main").scrollTop,280,"Same-view render should keep scroll position");
+ await handlers.click({target:fakeTarget("[data-view]","view","tasks")});
+ assert.equal(root.querySelector(".main").scrollTop,0,"Opening a different section must start at the top");
 
 });
 

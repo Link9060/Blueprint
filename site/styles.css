@@ -57,3 +57,15 @@
 .access-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px}
 .access-actions .btn{flex:1;min-width:150px;white-space:normal;min-height:43px}
 @media(max-width:530px){.access-actions{flex-direction:column}.access-actions .btn{width:100%;min-width:0}}
+
+
+/* Dashboard layout and independent workspace scrolling.
+   The sidebar stays in view while the main canvas scrolls. */
+.shell{height:100dvh;min-height:0;overflow:hidden}
+.side{height:100dvh;position:relative;top:auto;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#51626c transparent}
+.main{height:100dvh;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}
+.overview-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(270px,.95fr);gap:20px;align-items:stretch}
+.overview-grid>.card{min-width:0}
+@media(max-width:1100px){.overview-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:800px){.side{position:fixed;top:0;left:0}}
+@supports not (height:100dvh){.shell,.side,.main{height:100vh}}

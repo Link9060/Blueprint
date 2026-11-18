@@ -63,8 +63,51 @@ function renderOverview(){
  const upcoming=d.tasks.filter(t=>t.status!=="done").slice(0,4).map(taskLine).join("")||'<div class="empty">Nothing assigned right now.</div>';
  const updates=d.logs.slice(0,4).map(l=>'<div class="feed"><span class="feed-icon">'+icon("pencil",15)+'</span><div class="feed-text"><b>'+e(l.title)+'</b><p>'+e(l.subgroup)+' · '+e(l.body)+'</p></div><small class="feed-time">'+e(l.time)+'</small></div>').join("")||'<div class="empty">No build entries yet.</div>';
  const p=progress(d);
- return heading("TEAM WORKSPACE","A clearer way to build.","Your projects, people, and progress in one place.",'<span class="demo-label">'+(state.mode==="demo"?"DEMO WORKSPACE":"CONNECTED WORKSPACE")+'</span>')+sampleNote()+'<div class="stats">'+statHtml+'</div><div class="columns"><div class="column-stack">'+section("Your team's priorities",'<button data-view="tasks">View all tasks →</button>',upcoming)+section("Latest build activity",'<button data-view="logs">Open build log →</button>',updates)+'</div><div class="column-stack">'+section("Season progress","",'<div class="progress-head"><b>Task completion</b><span>'+p+'%</span></div><div class="track"><i style="width:'+p+'%"></i></div><p class="hint">'+done+' completed · '+open+' remaining. Keep the next handoff visible.</p>')+section("Coming up",'<button data-view="calendar">Full schedule →</button>',d.events.slice(0,3).map(x=>'<div class="feed"><div class="feed-icon">'+icon("calendar",15)+'</div><div class="feed-text"><b>'+e(x.title)+'</b><p>'+e(x.details)+'</p></div></div>').join("")||'<div class="empty">No upcoming events.</div>')+section("Team notices",'<button data-view="announcements">View all →</button>',(d.announcements||[]).slice(0,2).map(x=>'<div class="feed"><div class="feed-icon">'+icon("bell",15)+'</div><div class="feed-text"><b>'+e(x.title)+'</b><p>'+e(x.body)+'</p></div></div>').join("")||'<div class="empty">No announcements yet.</div>')+section("Blueprint brief","",'<div class="hint">The nightly review engine will summarize approved changes, current blockers and next steps once the live backend is configured. No AI summaries are being sent from this preview.</div>')+'</div></div>';
+ const priorities=section(
+  "Your team's priorities",
+  '<button data-view="tasks">View all tasks →</button>',
+  upcoming
+ );
+ const season=section(
+  "Season progress","",
+  '<div class="progress-head"><b>Task completion</b><span>'+p+'%</span></div>'+
+  '<div class="track"><i style="width:'+p+'%"></i></div>'+
+  '<p class="hint">'+done+' completed · '+open+' remaining. Keep the next handoff visible.</p>'
+ );
+ const activity=section(
+  "Latest build activity",
+  '<button data-view="logs">Open build log →</button>',
+  updates
+ );
+ const calendar=section(
+  "Coming up",
+  '<button data-view="calendar">Full schedule →</button>',
+  d.events.slice(0,3).map(x=>
+   '<div class="feed"><div class="feed-icon">'+icon("calendar",15)+'</div>'+
+   '<div class="feed-text"><b>'+e(x.title)+'</b><p>'+e(x.details)+'</p></div></div>'
+  ).join("")||'<div class="empty">No upcoming events.</div>'
+ );
+ const teamNotices=section(
+  "Team notices",
+  '<button data-view="announcements">View all →</button>',
+  (d.announcements||[]).slice(0,2).map(x=>
+   '<div class="feed"><div class="feed-icon">'+icon("bell",15)+'</div>'+
+   '<div class="feed-text"><b>'+e(x.title)+'</b><p>'+e(x.body)+'</p></div></div>'
+  ).join("")||'<div class="empty">No announcements yet.</div>'
+ );
+ const digest=section(
+  "Blueprint brief","",
+  '<div class="hint">An optional nightly engineering digest is planned for a future release. No AI summaries or notifications are enabled.</div>'
+ );
+ // Row-first order balances the empty-state cards instead of leaving a large
+ // unused block below the left column on teams with little activity.
+ return heading(
+  "TEAM WORKSPACE","A clearer way to build.","Your projects, people, and progress in one place.",
+  '<span class="demo-label">'+(state.mode==="demo"?"DEMO WORKSPACE":"CONNECTED WORKSPACE")+'</span>'
+ )+sampleNote()+'<div class="stats">'+statHtml+'</div>'+
+ '<div class="overview-grid">'+priorities+season+activity+calendar+teamNotices+digest+'</div>';
 }
+
 function renderTasks(){
  const tasks=state.data.tasks.filter(t=>(state.filter==="all"||t.status===state.filter)&&(state.taskScope==="all"||(state.mode==="demo"?t.assigned_to!=null:t.assigned_to===state.user?.id)));
  const allowed=canEdit();
@@ -187,7 +230,18 @@ function render(){
  if(state.mode==="live"&&state.member?.status==="pending"){app.innerHTML=waitingPage();return;}
  if(state.mode==="live"&&state.member?.status==="rejected"){app.innerHTML=rejectedPage();return;}
  if(!state.data){app.innerHTML=state.mode==="live"?connectionPage():landing();return;}
+ // The workspace has its own scroll viewport. Preserve position for edits
+ // and incoming live updates, but start at the top when changing sections.
+ const scrollKey=state.mode+":"+state.team+":"+state.view;
+ const previousMain=app.querySelector?.(".main");
+ const previousTop=previousMain?.scrollTop||0;
+ const sameView=state.renderScrollKey===scrollKey;
  app.innerHTML=shell()+modal();
+ state.renderScrollKey=scrollKey;
+ if(sameView){
+  const nextMain=app.querySelector?.(".main");
+  if(nextMain)nextMain.scrollTop=previousTop;
+ }
 }
 function toast(text){
  document.querySelector(".toast")?.remove();

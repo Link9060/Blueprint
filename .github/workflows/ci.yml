@@ -23,7 +23,7 @@ jobs:
           node --check site/config.js
           node --check site/roles.js
       - name: Run unit and schema tests
-        run: node --test tests/data.test.mjs tests/render.test.mjs tests/roles.test.mjs
+        run: node --test tests/data.test.mjs tests/render.test.mjs tests/roles.test.mjs tests/layout.test.mjs
   database:
     runs-on: ubuntu-latest
     services:
