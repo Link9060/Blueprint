@@ -60,7 +60,7 @@ create policy "Approved members report visible team messages"
    reporter_id=(select auth.uid()) and status='open'
    and reviewed_by is null and reviewed_at is null
    and private.is_approved_member(team_id)
-   and exists (select 1 from public.messages m where m.id=message_id and m.team_id=team_id and m.hidden_at is null)
+   and exists (select 1 from public.messages m where m.id=message_reports.message_id and m.team_id=message_reports.team_id and m.hidden_at is null)
  );
 create policy "Admins review reports for their team"
  on public.message_reports for update to authenticated
