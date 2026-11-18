@@ -1,10 +1,11 @@
 import {teams,groups,channels,workspace,save,reset,progress} from "./data.js";
 import {roleLabels,rolePreviewOptions,canManageTeam,canManageWork,roleIsPreviewable} from "./roles.js";
 import {avatarColors,avatarColorNames,avatarClass,localDateTime} from "./profile.js";
-import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,editLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,editLiveEvent,addLiveAnnouncement,getLiveProfile,saveLiveProfile,updateOwnSubgroup,subscribeTeam} from "./supabase.js";
+import {safeReferenceUrl,reportReasons,fabricationMethods,fabricationStatuses,fabricationLabels,fabricationStatusLabels,engineeringKinds} from "./engineering.js";
+import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,editLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,editLiveEvent,addLiveAnnouncement,getLiveProfile,saveLiveProfile,updateOwnSubgroup,subscribeTeam,reportTeamMessage,reviewTeamReport,setMessageVisibility,createEngineeringLink,deleteEngineeringLink,requestPart,setPartStatus} from "./supabase.js";
 
 const app=document.getElementById("app");
-const state={team:sessionStorage.getItem("blueprint-selected-team")||null,view:"overview",filter:"all",channel:"general",modal:null,menu:false,editingTaskId:null,editingProjectId:null,editingLogId:null,editingEventId:null,profile:null,authNotice:"",unsubscribe:null,subscriptionTeam:null,refreshBusy:false,realtimeTimer:null,taskScope:"all",rolePreview:null,mode:configured()?"live":"demo",user:null,member:null,data:null,loading:false,error:""};
+const state={team:sessionStorage.getItem("blueprint-selected-team")||null,view:"overview",filter:"all",channel:"general",modal:null,menu:false,editingTaskId:null,editingProjectId:null,editingLogId:null,editingEventId:null,reportMessageId:null,linkProjectId:null,profile:null,authNotice:"",unsubscribe:null,subscriptionTeam:null,refreshBusy:false,realtimeTimer:null,taskScope:"all",rolePreview:null,mode:configured()?"live":"demo",user:null,member:null,data:null,loading:false,error:""};
 const glyphs={
  overview:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
  tasks:'<path d="M9 5h12M9 12h12M9 19h12"/><path d="m3 5 1.3 1.3L6.5 4M3 12l1.3 1.3L6.5 11M3 19l1.3 1.3L6.5 18"/>',
@@ -29,7 +30,7 @@ function icon(name,size=17){return '<svg width="'+size+'" height="'+size+'" view
 function e(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function a(view,label,ico){return '<button type="button" data-view="'+view+'" class="'+(state.view===view?"active":"")+'"><span class="nav-icon">'+icon(ico)+'</span>'+label+'</button>';}
 function button(text,action,kind=""){
- const locked=previewReadOnly()&&["new-task","new-log","new-project","new-event","new-announcement"].includes(action);
+ const locked=previewReadOnly()&&["new-task","new-log","new-project","new-event","new-announcement","new-part"].includes(action);
  return '<button class="btn '+kind+'" type="button" data-action="'+action+'" '+(locked?"disabled":"")+'>'+text+'</button>';
 }
 function currentTeam(){return teams.find(t=>t.id===state.team)||teams[0];}
@@ -128,8 +129,24 @@ function renderLogs(){
  return heading("ENGINEERING HISTORY","Build log","Keep a reliable record of what changed, why it changed, and what comes next.",canEdit()?button(icon("plus",15)+" Add entry","new-log","primary"):"")+sampleNote()+section("Recent changes","",'<div class="timeline">'+(entries||'<div class="empty">No updates yet.</div>')+'</div>');
 }
 function renderProjects(){
- const cards=state.data.projects.map(p=>'<article class="card project"><div class="project-icon">'+e(p.icon||"◇")+'</div><h3>'+e(p.name)+'</h3><p>'+e(p.description)+'</p><div class="project-foot"><small>'+e(p.lead||p.subgroup||"General")+' · '+Number(p.progress||0)+'% progress</small><div class="track"><i style="width:'+Math.max(0,Math.min(100,Number(p.progress)||0))+'%"></i></div>'+(canEdit()?'<div style="margin-top:14px"><button type="button" class="btn small" data-edit-project="'+e(p.id)+'">'+icon("pencil",13)+' Edit project</button></div>':"")+'</div></article>').join("");
- return heading("THE ROBOT","Projects & subsystems","Track the mechanisms, people and work behind your robot.",canEdit()?button(icon("plus",15)+" New project","new-project","primary"):"")+sampleNote()+'<div class="grid-three">'+(cards||'<div class="empty">No projects yet. A team lead can create the first one.</div>')+'</div>';
+ const cards=state.data.projects.map(p=>{
+  const references=(state.data.projectLinks||[]).filter(link=>link.project_id===p.id);
+  const links=references.map(link=>{
+   const url=safeReferenceUrl(link.url);
+   return '<div class="reference-line">'+(url?'<a href="'+e(url)+'" target="_blank" rel="noopener noreferrer">'+e(link.title)+'</a>':'<span>Invalid reference</span>')+
+    '<small>'+e(link.kind.toUpperCase())+'</small>'+
+    (canEdit()?'<button type="button" class="subtle-action" data-remove-reference="'+e(link.id)+'" aria-label="Remove reference '+e(link.title)+'">Remove</button>':"")+'</div>';
+  }).join("");
+  return '<article class="card project"><div class="project-icon">'+e(p.icon||"◇")+'</div><h3>'+e(p.name)+'</h3><p>'+e(p.description)+'</p>'+
+   '<div class="project-foot"><small>'+e(p.lead||p.subgroup||"General")+' · '+Number(p.progress||0)+'% progress</small>'+
+   '<div class="track"><i style="width:'+Math.max(0,Math.min(100,Number(p.progress)||0))+'%"></i></div>'+
+   '<div class="project-references"><div class="reference-heading">ENGINEERING REFERENCES</div>'+
+   (links||'<small class="muted">No CAD or drawing links attached yet.</small>')+
+   (canEdit()?'<button type="button" class="btn small" data-add-reference="'+e(p.id)+'">'+icon("plus",13)+' Add reference</button>':"")+'</div>'+
+   (canEdit()?'<div class="project-edit-actions"><button type="button" class="btn small" data-edit-project="'+e(p.id)+'">'+icon("pencil",13)+' Edit project</button></div>':"")+'</div></article>';
+ }).join("");
+ return heading("THE ROBOT","Projects & subsystems","Robot workstreams with versioned CAD references, documents and progress.",canEdit()?button(icon("plus",15)+" New project","new-project","primary"):"")+
+  sampleNote()+'<div class="grid-three">'+(cards||'<div class="empty">No projects yet. A team lead can create the first one.</div>')+'</div>';
 }
 
 function renderPeople(){
@@ -167,9 +184,68 @@ function renderAdmin(){
 }
 
 function renderMessages(){
- const messages=(state.data.messages[state.channel]||[]).map(m=>'<div class="message"><div class="avatar">'+e(m.initials||initials(m.author))+'</div><div><b>'+e(m.author)+'</b><small>'+e(m.time)+'</small><p>'+e(m.text)+'</p></div></div>').join("");
- return heading("CONVERSATIONS","Team messages","Subgroup channels for clear, purposeful coordination.")+sampleNote()+'<div class="card chat"><aside class="channels"><h3>CHANNELS</h3>'+channels.map(c=>'<button class="channel '+(state.channel===c?"active":"")+'" data-channel="'+c+'"># '+e(c)+'</button>').join("")+'</aside><section class="conversation"><div class="chat-head"><b># '+e(state.channel)+'</b><small>Team '+e(state.team)+' · '+(state.mode==="demo"?"Local preview":"Team channel")+'</small></div><div class="messages">'+(messages||'<div class="empty">Start the conversation.</div>')+'</div><form class="compose" id="compose-form"><input class="field" name="body" maxlength="1000" placeholder="Message #'+e(state.channel)+'" aria-label="Message" required><button class="btn primary" type="submit">Send '+icon("arrow",14)+'</button></form></section></div>';
+ const messages=(state.data.messages[state.channel]||[]).map(m=>{
+  const moderator=canAdmin();
+  return '<div class="message '+(m.hidden?"message-muted":"")+'"><div class="avatar">'+e(m.initials||initials(m.author))+'</div>'+
+   '<div class="message-content"><div class="message-header"><b>'+e(m.author)+'</b><small>'+e(m.time)+'</small></div>'+
+   (m.hidden?'<small class="moderation-label">Hidden by a team moderator · visible to administrators</small>':"")+
+   '<p>'+e(m.text)+'</p><div class="message-actions">'+
+   (!m.hidden?'<button type="button" class="subtle-action" data-report-message="'+e(m.id)+'">Report</button>':"")+
+   (moderator?'<button type="button" class="subtle-action" data-message-visibility="'+e(m.id)+'" data-visible="'+(m.hidden?"yes":"no")+'">'+(m.hidden?"Restore":"Hide")+'</button>':"")+
+   '</div></div></div>';
+ }).join("");
+ return heading("CONVERSATIONS","Team messages","Subgroup channels with a private, administrator-reviewed report option.")+
+  sampleNote()+'<div class="card chat"><aside class="channels"><h3>CHANNELS</h3>'+
+  channels.map(c=>'<button class="channel '+(state.channel===c?"active":"")+'" data-channel="'+c+'"># '+e(c)+'</button>').join("")+
+  '</aside><section class="conversation"><div class="chat-head"><b># '+e(state.channel)+'</b><small>Team '+e(state.team)+
+  ' · '+(state.mode==="demo"?"Local preview":"Team channel")+'</small></div><div class="messages">'+
+  (messages||'<div class="empty">Start the conversation.</div>')+'</div>'+
+  '<form class="compose" id="compose-form"><input class="field" name="body" maxlength="1000" placeholder="Message #'+e(state.channel)+
+  '" aria-label="Message" required><button class="btn primary" type="submit">Send '+icon("arrow",14)+'</button></form></section></div>';
 }
+function renderManufacturing(){
+ const requests=state.data.partRequests||[];
+ const cards=requests.map(item=>{
+  const project=state.data.projects.find(p=>p.id===item.project_id);
+  return '<article class="card manufacture-item"><div class="manufacture-head"><div><span class="eyebrow">'+e(fabricationLabels[item.method]||"Other")+'</span>'+
+   '<h3>'+e(item.part_name)+'</h3></div><span class="pill">'+e(fabricationStatusLabels[item.status]||"Requested")+'</span></div>'+
+   '<p>'+e(item.notes||"No additional notes.")+'</p><small>Quantity: '+Number(item.quantity||1)+' · '+e(project?.name||"General team")+'</small>'+
+   (canEdit()?'<div class="manufacture-update"><label for="part-'+e(item.id)+'">Progress</label><select id="part-'+e(item.id)+'" class="field" data-part-status="'+e(item.id)+'">'+
+    fabricationStatuses.map(st=>'<option value="'+st+'" '+(item.status===st?"selected":"")+'>'+fabricationStatusLabels[st]+'</option>').join("")+'</select></div>':"")+'</article>';
+ }).join("");
+ return heading("FABRICATION","Manufacturing requests","Request parts and follow them from approval to completion.",button(icon("plus",15)+" Request a part","new-part","primary"))+
+  sampleNote()+'<div class="manufacture-board">'+(cards||'<div class="empty">No manufacturing requests yet.</div>')+'</div>';
+}
+function renderSafety(){
+ if(!canAdmin())return heading("TEAM SAFETY","Restricted","Only team administrators can review reports and activity history.");
+ const reports=state.data.reports||[];
+ const open=reports.filter(r=>r.status==="open");
+ const resolved=reports.filter(r=>r.status!=="open");
+ const reportCard=r=>{
+  const allMessages=Object.values(state.data.messages).flat();
+  const message=allMessages.find(m=>m.id===r.message_id);
+  const reporter=state.data.people.find(p=>p.id===r.reporter_id)?.name||"Team member";
+  return '<article class="card safety-item"><div class="report-header"><span class="eyebrow">'+e(r.reason.toUpperCase())+'</span><span class="pill">'+e(r.status)+'</span></div>'+
+   '<h3>Message report</h3><p>'+e(r.note||"No additional context supplied.")+'</p>'+
+   '<small>Submitted by '+e(reporter)+' · '+e(new Date(r.created_at).toLocaleString())+'</small>'+
+   (message?'<div class="reported-excerpt"><b>Reported message</b><p>'+e(message.text)+'</p></div>':'<p class="hint">Reported message may be hidden or outside the latest 300 messages.</p>')+
+   (r.status==="open"?'<div class="report-actions"><button type="button" class="btn small" data-review-report="'+e(r.id)+'" data-report-status="dismissed">Dismiss report</button>'+
+    '<button type="button" class="btn primary small" data-review-report="'+e(r.id)+'" data-report-status="reviewed">Mark reviewed</button></div>':"")+'</article>';
+ };
+ const history=(state.data.activity||[]).map(x=>
+  '<div class="activity-row"><div><b>'+e(x.action.replaceAll("_"," "))+'</b><small>'+e(x.subject_type)+' · '+e(x.actor)+'</small></div>'+
+  '<small>'+e(new Date(x.created_at).toLocaleString())+'</small></div>'
+ ).join("");
+ return heading("TEAM SAFETY","Moderation & activity","Review reports, hide harmful messages in team channels and inspect an append-only history.")+
+  sampleNote()+notice('Reports are private. Only team administrators can review them. Messages are hidden rather than deleted so records remain available for review.')+
+  section("Needs review",'<span class="pill">'+open.length+' open</span>',
+   open.map(reportCard).join("")||'<div class="empty">No outstanding reports.</div>')+
+  '<div class="dashboard-spacer"></div>'+
+  section("Resolved reports","",resolved.slice(0,20).map(reportCard).join("")||'<div class="empty">No resolved reports.</div>')+
+  '<div class="dashboard-spacer"></div>'+section("Activity history","",
+   history||'<div class="empty">No recorded moderation or engineering changes yet.</div>');
+}
+
 function renderProfile(){
  const p=currentProfile();
  const name=p.full_name||state.user?.user_metadata?.full_name||"Team member";
@@ -199,12 +275,12 @@ function renderSettings(){
 }
 function canEdit(){return canManageWork(effectiveRole());}
 function sidebar(){
- const navigation=a("overview","Overview","overview")+a("announcements","Announcements","bell")+a("tasks","Tasks","tasks")+a("logs","Build log","logs")+a("projects","Robot projects","projects")+a("messages","Messages","messages")+a("calendar","Calendar","calendar")+a("people","Members","people");
- return '<div class="screen '+(state.menu?"show":"")+'" data-action="close-menu"></div><aside class="side '+(state.menu?"open":"")+'"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><button class="team-picker" data-action="switch-team"><span class="team-box">'+e(state.team)+'</span><span><b>'+e(currentTeam().name)+'</b><small>Team workspace</small></span><span class="chev">'+icon("chevron",14)+'</span></button>'+previewSelector("sidebar")+'<div class="side-caption">WORKSPACE</div><nav class="nav" aria-label="Workspace">'+navigation+'</nav><div class="side-caption">GENERAL</div><nav class="nav" aria-label="General">'+(canAdmin()?a("admin","Membership","people"):"")+a("profile","My profile","people")+a("settings","Settings","settings")+'</nav><div class="side-bottom">'+avatarHtml(currentProfile().full_name||state.user?.user_metadata?.full_name||"Preview User",currentProfile().avatar_color)+'<div><b>'+(state.mode==="demo"?"Preview user":e(currentProfile().full_name||state.user?.user_metadata?.full_name||"Team member"))+'</b><small>'+(state.mode==="demo"?"Demo workspace":e(roleLabels[actualRole()]||"Member"))+'</small></div><button class="push" data-action="sign-out" aria-label="Leave workspace">'+icon("logout",17)+'</button></div></aside>';
+ const navigation=a("overview","Overview","overview")+a("announcements","Announcements","bell")+a("tasks","Tasks","tasks")+a("logs","Build log","logs")+a("projects","Robot projects","projects")+a("manufacturing","Manufacturing","projects")+a("messages","Messages","messages")+a("calendar","Calendar","calendar")+a("people","Members","people");
+ return '<div class="screen '+(state.menu?"show":"")+'" data-action="close-menu"></div><aside class="side '+(state.menu?"open":"")+'"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><button class="team-picker" data-action="switch-team"><span class="team-box">'+e(state.team)+'</span><span><b>'+e(currentTeam().name)+'</b><small>Team workspace</small></span><span class="chev">'+icon("chevron",14)+'</span></button>'+previewSelector("sidebar")+'<div class="side-caption">WORKSPACE</div><nav class="nav" aria-label="Workspace">'+navigation+'</nav><div class="side-caption">GENERAL</div><nav class="nav" aria-label="General">'+(canAdmin()?a("admin","Membership","people")+a("safety","Moderation","info"):"")+a("profile","My profile","people")+a("settings","Settings","settings")+'</nav><div class="side-bottom">'+avatarHtml(currentProfile().full_name||state.user?.user_metadata?.full_name||"Preview User",currentProfile().avatar_color)+'<div><b>'+(state.mode==="demo"?"Preview user":e(currentProfile().full_name||state.user?.user_metadata?.full_name||"Team member"))+'</b><small>'+(state.mode==="demo"?"Demo workspace":e(roleLabels[actualRole()]||"Member"))+'</small></div><button class="push" data-action="sign-out" aria-label="Leave workspace">'+icon("logout",17)+'</button></div></aside>';
 }
 function shell(){
- const views={overview:renderOverview,announcements:renderAnnouncements,tasks:renderTasks,logs:renderLogs,projects:renderProjects,messages:renderMessages,calendar:renderCalendar,people:renderPeople,admin:renderAdmin,profile:renderProfile,settings:renderSettings};
- const labels={overview:"Overview",announcements:"Announcements",tasks:"Tasks",logs:"Build log",projects:"Robot projects",messages:"Messages",calendar:"Calendar",people:"Members",admin:"Membership",profile:"My profile",settings:"Settings"};
+ const views={overview:renderOverview,announcements:renderAnnouncements,tasks:renderTasks,logs:renderLogs,projects:renderProjects,messages:renderMessages,calendar:renderCalendar,people:renderPeople,admin:renderAdmin,safety:renderSafety,manufacturing:renderManufacturing,profile:renderProfile,settings:renderSettings};
+ const labels={overview:"Overview",announcements:"Announcements",tasks:"Tasks",logs:"Build log",projects:"Robot projects",messages:"Messages",calendar:"Calendar",people:"Members",admin:"Membership",safety:"Moderation",manufacturing:"Manufacturing",profile:"My profile",settings:"Settings"};
  return '<div class="shell">'+sidebar()+'<main class="main"><div class="bar"><div class="actions"><button class="round-button mobile-toggle" data-action="menu" aria-label="Open menu">'+icon("menu")+'</button><div class="crumb">Team '+e(state.team)+' <span>/</span> '+labels[state.view]+'</div></div><div class="bar-right"><span class="eyebrow" style="letter-spacing:.8px">'+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})+'</span><button class="round-button" aria-label="Refresh workspace" data-action="refresh-live" title="Refresh workspace">↻</button><button class="round-button" aria-label="Notifications" data-action="notifications">'+icon("bell")+'</button><span class="bar-avatar">'+(state.mode==="demo"?"BP":"TM")+'</span></div></div>'+previewBanner()+'<div class="content enter">'+(views[state.view]||renderOverview)()+'</div></main></div>';
 }
 function landing(){
