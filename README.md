@@ -3,7 +3,7 @@
 A focused, quietly designed workspace for FRC robotics teams **1810** and **9316**.
 
 **Website:** https://link9060.github.io/Blueprint/  
-**Dedicated Supabase:** \`Resonant. Blueprint\` (\`weaytuxrcanwdbpcmlce\`)
+**Dedicated Supabase:** `Resonant. Blueprint` (`weaytuxrcanwdbpcmlce`)
 
 ## Live foundation
 
@@ -24,14 +24,14 @@ A focused, quietly designed workspace for FRC robotics teams **1810** and **9316
 
 | Layer | Location |
 |---|---|
-| Static frontend | \`site/index.html\`, \`site/app.js\`, \`site/styles.css\` |
-| Supabase adapter | \`site/supabase.js\` |
-| Browser-safe project configuration | \`site/config.js\` |
-| Fictional preview fixtures | \`site/data.js\` |
-| Base team/RLS schema | \`database/schema.sql\` |
-| Announcements and realtime extension | \`database/upgrade_v2.sql\` |
-| GitHub Pages deployment | \`.github/workflows/pages.yml\` |
-| Automated CI | \`.github/workflows/ci.yml\`, \`tests/\` |
+| Static frontend | `site/index.html`, `site/app.js`, `site/styles.css` |
+| Supabase adapter | `site/supabase.js` |
+| Browser-safe project configuration | `site/config.js` |
+| Fictional preview fixtures | `site/data.js` |
+| Base team/RLS schema | `database/schema.sql` |
+| Announcements and realtime extension | `database/upgrade_v2.sql` |
+| GitHub Pages deployment | `.github/workflows/pages.yml` |
+| Automated CI | `.github/workflows/ci.yml`, `tests/` |
 
 The site uses a pinned browser version of supabase-js. Its publishable key is public by design; no service-role key or Google OAuth secret belongs in the repository. All real team data is protected by database row-level security and role restrictions.
 

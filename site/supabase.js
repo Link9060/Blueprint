@@ -35,17 +35,23 @@ export async function membership(team,userId){
 export async function approveMembership(team,userId,status,role){
  if(!["approved","rejected"].includes(status)||!["member","lead","captain","mentor","admin"].includes(role))throw new Error("Invalid membership update.");
  const sb=await client();
- unwrap(await sb.from("team_memberships").update({status,role}).eq("team_id",team).eq("user_id",userId).eq("status","pending"));
+ const rows=unwrap(await sb.from("team_memberships").update({status,role}).eq("team_id",team).eq("user_id",userId).eq("status","pending").select("user_id"));
+ if(!rows?.length)throw new Error("Request is no longer pending or access was denied.");
 }
 export async function updateMemberRole(team,userId,role){
  if(!["member","lead","captain","mentor","admin"].includes(role))throw new Error("Invalid team role.");
  const sb=await client();
- unwrap(await sb.from("team_memberships").update({role}).eq("team_id",team).eq("user_id",userId).eq("status","approved"));
+ const rows=unwrap(await sb.from("team_memberships").update({role}).eq("team_id",team).eq("user_id",userId).eq("status","approved").select("user_id"));
+ if(!rows?.length)throw new Error("Role could not be changed; check administrator access.");
 }
 export async function requestMembership(team,user,fullName,subgroup){
  if(!teams.find(x=>x.id===team))throw new Error("Unknown team.");
  const sb=await client();
- unwrap(await sb.from("profiles").upsert({id:user.id,full_name:fullName},{onConflict:"id"}));
+ const profile=await sb.from("profiles").insert({id:user.id,full_name:fullName});
+ if(profile.error){
+  if(profile.error.code!=="23505")throw profile.error;
+  unwrap(await sb.from("profiles").update({full_name:fullName}).eq("id",user.id));
+ }
  unwrap(await sb.from("team_memberships").insert({team_id:team,user_id:user.id,role:"member",subgroup,status:"pending"}));
 }
 async function select(team,table,columns="*"){
@@ -74,10 +80,12 @@ export async function editLiveTask(team,id,changes){
  const allowed=["title","subgroup","status","priority","assigned_to","due_date"];
  const update=Object.fromEntries(Object.entries(changes).filter(([key])=>allowed.includes(key)));
  const sb=await client();
- unwrap(await sb.from("tasks").update(update).eq("team_id",team).eq("id",id));
+ const rows=unwrap(await sb.from("tasks").update(update).eq("team_id",team).eq("id",id).select("id"));
+ if(!rows?.length)throw new Error("Task not changed; verify your access.");
 }
 export async function setLiveTaskStatus(team,id,status){
- const sb=await client();unwrap(await sb.from("tasks").update({status}).eq("team_id",team).eq("id",id));
+ const sb=await client();const rows=unwrap(await sb.from("tasks").update({status}).eq("team_id",team).eq("id",id).select("id"));
+ if(!rows?.length)throw new Error("Task not changed; verify assignment.");
 }
 export async function addLiveLog(team,title,body,subgroup,userId){
  const sb=await client();unwrap(await sb.from("build_logs").insert({team_id:team,title,body,subgroup,author_id:userId}));
