@@ -26,8 +26,10 @@ jobs:
           node --check site/engineering.js
           node --check site/planning.js
           node --check site/coordination.js
+          node --check site/dom-patch.js
+          node --check site/motion.js
       - name: Run unit and schema tests
-        run: node --test tests/data.test.mjs tests/render.test.mjs tests/roles.test.mjs tests/layout.test.mjs tests/profile.test.mjs tests/engineering.test.mjs tests/planning.test.mjs tests/coordination.test.mjs
+        run: node --test tests/data.test.mjs tests/render.test.mjs tests/roles.test.mjs tests/layout.test.mjs tests/profile.test.mjs tests/engineering.test.mjs tests/planning.test.mjs tests/coordination.test.mjs tests/dom-patch.test.mjs
   database:
     runs-on: ubuntu-latest
     services:
