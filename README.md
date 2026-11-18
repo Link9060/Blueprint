@@ -13,7 +13,9 @@ A focused, quietly designed workspace for FRC robotics teams **1810** and **9316
 - Protected **Owner** role above Admin, provisioned only through verified trusted administration
 - Visual-only **role inspector** for Owner and demo, switching among Admin, Captain, Mentor, Lead, and Member
 - Team dashboards with tasks, owners, priorities, statuses, due dates and progress
-- Build logs and subsystem project creation/editing
+- Build logs and subsystem project creation/editing, including updates by Leads, Mentors, Captains, Admins and Owners
+- Calendar event editing by the same leadership roles, with edit attribution
+- Personal profile editor: display name, team subgroup, short headline/bio, and selectable avatar colors
 - Team announcements, meeting and event scheduling
 - Team-scoped channels, with RLS-protected Supabase Realtime updates
 - Approved member directory and administrator approval/role editor
@@ -42,6 +44,10 @@ The site uses a pinned browser version of supabase-js. Its publishable key is pu
 CI runs JavaScript syntax and interface smoke tests, fixture separation checks, and a temporary PostgreSQL database with simulated Supabase Auth. It applies both schema files and checks permissions for pending members, approved members, team leads, administrators and users on opposite teams.
 
 These tests do **not** replace real-browser tests, real Google/email provider verification, or school mentor approval.
+
+## Profile privacy and access
+
+Approved teammates can see a member's chosen name, headline, bio, avatar color, and subgroup. Email addresses remain private in Supabase Auth. Members can edit their own profile and approved-team subgroup, not roles or permissions. Managers can edit log/event contents but original authorship is retained, with edits attributed to the editor. Role previews remain visual and read-only.
 
 ## Next milestones
 

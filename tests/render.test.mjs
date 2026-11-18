@@ -32,6 +32,7 @@ test("landing and sample workspace views render without browser dependencies", a
   ["announcements","Announcements"],
   ["admin","Membership review"],
   ["messages","Team messages"],
+  ["profile","My profile"],
   ["settings","Workspace settings"]
  ]){
   await handlers.click({target:fakeTarget("[data-view]","view",view)});
@@ -56,6 +57,35 @@ test("landing and sample workspace views render without browser dependencies", a
  await handlers.submit({target:{id:"announcement-form",values:{title:"Demo briefing",body:"An example update"}} ,preventDefault(){}});
  assert.ok(html.includes("Demo briefing"));
 
+ // Team leadership can edit existing logs and calendar events in preview.
+ await handlers.click({target:fakeTarget("[data-view]","view","logs")});
+ assert.ok(html.includes('data-edit-log="l1"'));
+ await handlers.click({target:fakeTarget("[data-edit-log]","editLog","l1")});
+ assert.ok(html.includes('id="log-form"'));
+ assert.ok(html.includes('value="Intake assembly updated"'));
+ await handlers.submit({target:{id:"log-form",values:{
+  title:"Intake fit verified",body:"Fit test confirmed.",subgroup:"Mechanical"
+ }},preventDefault(){}});
+ assert.ok(html.includes("Intake fit verified"));
+ await handlers.click({target:fakeTarget("[data-view]","view","calendar")});
+ assert.ok(html.includes('data-edit-event="demo-1810-event-0"'));
+ await handlers.click({target:fakeTarget("[data-edit-event]","editEvent","demo-1810-event-0")});
+ assert.ok(html.includes('id="event-form"'));
+ await handlers.submit({target:{id:"event-form",values:{
+  title:"Updated build session",start:"2026-11-21T16:00"
+ }},preventDefault(){}});
+ assert.ok(html.includes("Updated build session"));
+ await handlers.click({target:fakeTarget("[data-view]","view","profile")});
+ assert.ok(html.includes('id="profile-form"'));
+ assert.ok(html.includes('name="avatar_color"'));
+ await handlers.submit({target:{id:"profile-form",values:{
+  full_name:"Demo Operator",subgroup:"Mechanical",headline:"Robot CAD designer",
+  bio:"Testing profile customization",avatar_color:"sage"
+ }},preventDefault(){}});
+ assert.ok(html.includes("Demo Operator"));
+ assert.ok(html.includes("Robot CAD designer"));
+ assert.ok(html.includes("avatar-sage"));
+
  // The role inspector must hide admin tools in the Member view and never grant
  // or change server-side permissions.
  const selectRole=role=>({
@@ -65,6 +95,8 @@ test("landing and sample workspace views render without browser dependencies", a
  await handlers.change({target:selectRole("member")});
  assert.ok(html.includes("Viewing as Member"));
  assert.ok(!html.includes('data-view="admin"'));
+ await handlers.click({target:fakeTarget("[data-view]","view","logs")});
+ assert.ok(!html.includes("data-edit-log="),"Member preview should not show log editing");
  await handlers.click(action("new-project"));
  assert.ok(!html.includes('id="project-form"'),"preview must remain read-only");
  await handlers.change({target:selectRole("admin")});
