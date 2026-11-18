@@ -927,7 +927,7 @@ app.addEventListener("change",async ev=>{
  }catch(err){toast("Role update failed: "+(err.message||"Unknown error"));await refresh(true);}
 });
 app.addEventListener("submit",async ev=>{
- const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form","profile-form","report-form","reference-form","part-form","stock-form","bom-form","milestone-form"].includes(form.id))return;
+ const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form","profile-form","report-form","reference-form","part-form","stock-form","bom-form","milestone-form","dependency-form","checklist-form"].includes(form.id))return;
  ev.preventDefault();if(previewReadOnly())return toast("Role preview is read-only. Exit preview to save changes.");const f=new FormData(form);
  try{
  if(form.id==="magic-link-form"){
@@ -940,6 +940,49 @@ app.addEventListener("submit",async ev=>{
   const name=String(f.get("name")||"").trim().slice(0,80),subgroup=String(f.get("subgroup")||"");
   if(!name||!groups.includes(subgroup))return toast("Enter a valid name and subgroup.");
   await requestMembership(state.team,state.user,name,subgroup);await refresh();toast("Access request submitted.");return;
+ }
+ if(form.id==="dependency-form"){
+  if(!canEdit())return toast("Only team Leads can manage task prerequisites.");
+  const taskId=state.dependencyTaskId,preId=String(f.get("prerequisite_id")||"");
+  const dependent=state.data.tasks.find(x=>x.id===taskId);
+  const prerequisite=state.data.tasks.find(x=>x.id===preId);
+  if(!dependent||!prerequisite||wouldCreateCycle(taskId,preId,state.data.taskDependencies||[])||
+     state.data.taskDependencies.some(d=>d.task_id===taskId&&d.prerequisite_id===preId)){
+   return toast("Choose another task. Circular or duplicate prerequisites are not allowed.");
+  }
+  if(dependent.status==="done"&&prerequisite.status!=="done"){
+   return toast("Reopen the dependent task before adding an unfinished prerequisite.");
+  }
+  if(state.mode==="demo"){
+   state.data.taskDependencies.push({team_id:state.team,task_id:taskId,prerequisite_id:preId});
+   save(state.team,state.data);render();
+  }else{await addTaskDependency(state.team,taskId,preId,state.user.id);await refresh(true);}
+  toast("Prerequisite linked.");return;
+ }
+ if(form.id==="checklist-form"){
+  if(!canEdit())return toast("Only team Leads can manage event checklists.");
+  const eventId=state.checklistEventId,editing=state.modal==="checklist-edit";
+  const title=String(f.get("title")||"").trim(),notes=String(f.get("notes")||"").trim();
+  const category=String(f.get("category")||"other"),assigned_to=String(f.get("assigned_to")||"")||null;
+  const status=editing?String(f.get("status")||"todo"):"todo";
+  if(!state.data.events.some(x=>x.id===eventId)||!title||title.length>140||
+    notes.length>800||!preparationCategories.includes(category)||!["todo","done"].includes(status)||
+    (assigned_to&&!state.data.people.some(p=>p.id===assigned_to))){
+    return toast("Check the checklist details and assignee.");
+  }
+  const fields={title,notes,category,assigned_to,status};
+  if(state.mode==="demo"){
+   if(editing){
+    const item=state.data.eventChecklist.find(x=>String(x.id)===String(state.editingChecklistId));
+    if(!item)return toast("Preparation item no longer exists.");
+    Object.assign(item,fields);
+   }else state.data.eventChecklist.push({id:"demo-checklist-"+Date.now(),event_id:eventId,...fields});
+   save(state.team,state.data);
+  }else if(editing)await editEventChecklistItem(state.team,state.editingChecklistId,fields);
+  else await addEventChecklistItem(state.team,{event_id:eventId,...fields},state.user.id);
+  state.editingChecklistId=null;state.checklistEventId=null;state.modal=null;state.view="calendar";
+  if(state.mode==="live")await refresh(true);else render();
+  toast(editing?"Preparation item updated.":"Preparation item added.");return;
  }
  if(form.id==="stock-form"){
   if(!canEdit())return toast("Only team Leads and above can change inventory.");
@@ -1161,6 +1204,8 @@ app.addEventListener("submit",async ev=>{
   const status=String(f.get("status")||"todo");
   if(!title||!groups.includes(subgroup)||!["Low","Normal","High"].includes(priority)||!["todo","in_progress","blocked","done"].includes(status))return toast("Check the task fields.");
   if(assignedTo&&!state.data.people.some(p=>p.id===assignedTo))return toast("Choose an approved team member.");
+  if(editing&&status==="done"&&taskBlockers(state.editingTaskId,state.data.taskDependencies||[],state.data.tasks).length)
+   return toast("Finish prerequisite tasks before marking this task complete.");
   if(dueDate&&!/^\d{4}-\d{2}-\d{2}$/.test(dueDate))return toast("Enter a valid due date.");
   const changes={title,subgroup,priority,assigned_to:assignedTo,due_date:dueDate||null,status};
   if(state.mode==="demo"){
