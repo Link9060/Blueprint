@@ -259,13 +259,30 @@ function renderInventory(){
 }
 
 function renderPeople(){
- const cards=state.data.people.map(p=>
-  '<article class="card person">'+avatarHtml(p.name,p.avatar_color)+
-  '<div class="person-details"><h3>'+e(p.name)+'</h3><small>'+e(roleLabels[p.role]||p.role)+' · '+e(p.group)+'</small>'+
-  (p.headline?'<p class="person-headline">'+e(p.headline)+'</p>':"")+
-  (p.bio?'<p class="person-bio">'+e(p.bio)+'</p>':"")+'</div></article>'
- ).join("");
- return heading("PEOPLE & ROLES","Team directory","Find the right person or subgroup for the next step.")+sampleNote()+'<div class="people">'+(cards||'<div class="empty">The directory will populate when members join.</div>')+'</div>';
+ const actorRole=effectiveRole();
+ const currentId=state.mode==="demo"?"preview-owner":state.user?.id;
+ const cards=state.data.people.map(p=>{
+  const choices=canEdit()&&!previewReadOnly()?roleOptionsForManager(actorRole,p.role,p.id===currentId):[];
+  const controls=choices.length?'<div class="directory-role"><label for="directory-'+e(p.id)+'">TEAM ROLE</label><select id="directory-'+e(p.id)+'" class="field" data-directory-role="'+e(p.id)+'" aria-label="Role of '+e(p.name)+'">'+
+   choices.map(r=>'<option value="'+r+'" '+(p.role===r?"selected":"")+'>'+e(roleLabels[r])+'</option>').join("")+'</select></div>':
+   '<span class="directory-role-label">'+e(roleLabels[p.role]||p.role)+(p.role==="owner"?" · Protected":"")+'</span>';
+  return '<article class="card person">'+avatarHtml(p.name,p.avatar_color)+
+   '<div class="person-details"><h3>'+e(p.name)+'</h3><small>'+e(p.group)+'</small>'+
+   (p.headline?'<p class="person-headline">'+e(p.headline)+'</p>':"")+
+   (p.bio?'<p class="person-bio">'+e(p.bio)+'</p>':"")+controls+'</div></article>';
+ }).join("");
+ const ownRequests=(state.data.roleRequests||[]).filter(r=>r.requester_id===state.user?.id);
+ const pending=(state.data.roleRequests||[]).filter(r=>r.status==="pending"&&r.requester_id!==state.user?.id);
+ const queue=canEdit()?pending.map(r=>{
+  const person=state.data.people.find(p=>p.id===r.requester_id);
+  const allowed=roleOptionsForManager(actorRole,person?.role||"member",false).includes(r.requested_role);
+  return '<article class="card directory-request"><div><b>'+e(person?.name||"Member")+'</b><small>Requests '+e(roleLabels[r.requested_role]||r.requested_role)+'</small><p>'+e(r.reason||"No reason supplied")+'</p></div>'+
+   (allowed?'<div class="request-actions"><button class="btn small" data-role-request-decision="'+e(r.id)+'" data-decision-role="declined">Decline</button><button class="btn primary small" data-role-request-decision="'+e(r.id)+'" data-decision-role="approved">Approve</button></div>':'<small class="hint">Higher-ranking approval required</small>')+'</article>';
+ }).join(""):"";
+ return heading("PEOPLE & ROLES","Team directory","Find your team and manage roles with rank-limited permissions.",state.mode==="live"?button("Request higher role","request-role"):"")+
+  sampleNote()+'<div class="people">'+(cards||'<div class="empty">No members to show.</div>')+'</div>'+
+  (ownRequests.length?'<p class="hint">Your role requests: '+ownRequests.slice(0,3).map(r=>e(roleLabels[r.requested_role])+' ('+e(r.status)+')').join(" · ")+'</p>':"")+
+  (canEdit()&&pending.length?'<section class="directory-requests"><h2>Requests for higher roles</h2>'+queue+'</section>':"");
 }
 function renderCalendar(){
  const cards=state.data.events.map(ev=>{
