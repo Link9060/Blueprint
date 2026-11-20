@@ -671,6 +671,9 @@ function render(){
  const previousMain=app.querySelector?.(".main");
  const previousTop=previousMain?.scrollTop||0;
  const sameView=state.renderScrollKey===scrollKey;
+ const oldChat=app.querySelector?.(".messages");
+ const chatKey=state.team+":"+state.channel;
+ const pinChat=state.view==="messages"&&(!oldChat||state.lastChatKey!==chatKey||((oldChat.scrollHeight||0)-(oldChat.scrollTop||0)-(oldChat.clientHeight||0)<95));
  const markup=shell()+modal();
  // Reconcile the existing shell for menus, saves and incoming realtime changes.
  // Minimal non-browser test environments continue to use the legacy fallback.
@@ -678,6 +681,11 @@ function render(){
  state.renderScrollKey=scrollKey;
  const nextMain=app.querySelector?.(".main");
  if(nextMain)nextMain.scrollTop=sameView?previousTop:0;
+ if(state.view==="messages"){
+  const chat=app.querySelector?.(".messages");
+  if(chat&&pinChat)chat.scrollTop=chat.scrollHeight||0;
+  state.lastChatKey=chatKey;
+ }
 }
 function toast(text){
  document.querySelector(".toast")?.remove();
@@ -694,7 +702,7 @@ async function refresh(quiet=false){
  if(state.mode==="demo"){state.data=workspace(state.team);render();return;}
  if(state.refreshBusy)return;
  state.refreshBusy=true;
- const previousDraft=quiet?document.querySelector("#compose-form input")?.value:null;
+ const previousDraft=quiet?document.querySelector("#compose-form textarea")?.value:null;
  const requestedTeam=state.team;
  // Keep the current workspace visible during saves and refreshes.
  // Only first-time loading needs the full-screen state.
@@ -739,7 +747,7 @@ async function refresh(quiet=false){
   state.loading=false;state.refreshBusy=false;
   render();
   if(quiet&&previousDraft!=null){
-   const input=document.querySelector("#compose-form input");
+   const input=document.querySelector("#compose-form textarea");
    if(input)input.value=previousDraft;
   }
  }
@@ -1120,9 +1128,23 @@ app.addEventListener("change",async ev=>{
   toast("Member role updated.");
  }catch(err){toast("Role update failed: "+(err.message||"Unknown error"));await refresh(true);}
 });
+app.addEventListener("keydown",ev=>{
+ const compose=ev.target?.closest?.("#compose-form textarea");
+ if(!compose||ev.key!=="Enter"||ev.shiftKey||ev.isComposing||ev.ctrlKey||ev.altKey||ev.metaKey)return;
+ ev.preventDefault();
+ compose.form?.requestSubmit?.();
+});
 app.addEventListener("submit",async ev=>{
  const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form","profile-form","report-form","reference-form","part-form","stock-form","bom-form","milestone-form","dependency-form","checklist-form","role-request-form"].includes(form.id))return;
- ev.preventDefault();if(previewReadOnly())return toast("Role preview is read-only. Exit preview to save changes.");const f=new FormData(form);
+ ev.preventDefault();if(previewReadOnly())return toast("Role preview is read-only. Exit preview to save changes.");
+ const composing=form.id==="compose-form";
+ if(composing){
+  if(form.dataset.sending==="yes")return;
+  form.dataset.sending="yes";
+  const sendButton=form.querySelector?.('button[type="submit"]');
+  if(sendButton)sendButton.disabled=true;
+ }
+ const f=new FormData(form);
  try{
  if(form.id==="magic-link-form"){
   const email=String(f.get("email")||"").trim();
@@ -1439,9 +1461,18 @@ app.addEventListener("submit",async ev=>{
   const text=String(f.get("body")||"").trim().slice(0,1000);if(!text)return;
   if(state.mode==="demo"){(state.data.messages[state.channel]||=([])).push({id:"demo-message-"+Date.now(),author:"You (preview)",initials:"YP",time:new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),text,hidden:false});save(state.team,state.data);}
   else await sendLiveMessage(state.team,state.channel,text,state.user.id);
+  const textarea=form.querySelector?.('textarea[name="body"]');
+  if(textarea)textarea.value="";
  }
- if(state.mode==="live")await refresh();else render();
+ if(state.mode==="live")await refresh(true);else render();
  }catch(err){toast("Could not save: "+(err.message||"Unknown error"));}
+ finally{
+  if(composing){
+   form.dataset.sending="no";
+   const sendButton=form.querySelector?.('button[type="submit"]');
+   if(sendButton)sendButton.disabled=false;
+  }
+ }
 });
 document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&state.modal){state.modal=null;render();}});
 installMotion(app);
