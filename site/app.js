@@ -65,7 +65,7 @@ const statusWritesInFlight=new Set();
 function paintCompletion(kind,id,previousStatus,nextStatus){
  const attr=kind==="task"?"data-toggle":"data-checklist-toggle";
  const selector="["+attr+"]";
- for(const box of app.querySelectorAll(selector)){
+ for(const box of (app.querySelectorAll?.(selector)||[])){
   if(box.getAttribute(attr)!==String(id))continue;
   const completed=nextStatus==="done";
   box.classList.toggle("done",completed);
@@ -86,7 +86,7 @@ function paintCompletion(kind,id,previousStatus,nextStatus){
 }
 function clearCompletionPending(kind,id){
  const attr=kind==="task"?"data-toggle":"data-checklist-toggle";
- for(const box of app.querySelectorAll("["+attr+"]")){
+ for(const box of (app.querySelectorAll?.("["+attr+"]")||[])){
   if(box.getAttribute(attr)===String(id))box.removeAttribute("aria-busy");
  }
 }
