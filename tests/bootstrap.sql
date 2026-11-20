@@ -2,7 +2,8 @@
 create role anon nologin;
 create role authenticated nologin;
 create schema auth;
-create table auth.users (id uuid primary key);
+create table auth.users (id uuid primary key,email text,email_confirmed_at timestamptz);
+create table auth.identities (user_id uuid not null references auth.users(id),provider text not null,identity_data jsonb not null default '{}'::jsonb);
 create or replace function auth.uid()
 returns uuid language sql stable set search_path = ''
 as $$
