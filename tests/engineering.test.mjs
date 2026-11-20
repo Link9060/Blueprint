@@ -32,8 +32,8 @@ test("Moderation UI and API are gated and do not remove source messages",()=>{
  const app=readFileSync(new URL("../site/app.js",import.meta.url),"utf8");
  const api=readFileSync(new URL("../site/supabase.js",import.meta.url),"utf8");
  assert.match(app,/function renderSafety\(\)/);
- assert.match(app,/if\(!canAdmin\(\)\)return heading\("TEAM SAFETY"/);
- assert.match(app,/previewReadOnly\(\)\|\|!canAdmin\(\)/);
+ assert.match(app,/if\(!canEdit\(\)\)return heading\("TEAM SAFETY"/);
+ assert.match(app,/previewReadOnly\(\)\|\|!canEdit\(\)/);
  assert.match(app,/id:"demo-message-"\+Date\.now\(\)/);
  assert.match(api,/export async function reportTeamMessage/);
  assert.match(api,/export async function setMessageVisibility/);
