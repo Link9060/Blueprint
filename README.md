@@ -20,7 +20,7 @@ A focused, quietly designed workspace for FRC robotics teams **1810** and **9316
 - Team-scoped channels, with RLS-protected Supabase Realtime updates
 - Approved member directory and administrator approval/role editor
 - Fictional sample workspace available without signing in
-- Responsive dark sidebar + light workspace with understated drafting animations, and reduced-motion support
+- MONO Archive-inspired warm paper workspace and light sidebar with crisp black navigation, editorial typography, understated drafting animations, and reduced-motion support
 
 **Important:** Connecting the database does not mean onboarding is complete. See **docs/SETUP.md** for the remaining authentication configuration and authorized first-admin setup. User-facing flows must be tested with separate test accounts before handling real student data.
 
@@ -28,7 +28,7 @@ A focused, quietly designed workspace for FRC robotics teams **1810** and **9316
 
 | Layer | Location |
 |---|---|
-| Static frontend | `site/index.html`, `site/app.js`, `site/styles.css` |
+| Static frontend | `site/index.html`, `site/app.js`, `site/styles.css`, `site/mono-theme.css` |
 | Supabase adapter | `site/supabase.js` |
 | Browser-safe project configuration | `site/config.js` |
 | Fictional preview fixtures | `site/data.js` |
