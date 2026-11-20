@@ -1040,6 +1040,27 @@ app.addEventListener("click",async ev=>{
  if(button){await dispatchAction(button.dataset.action);}
 });
 app.addEventListener("change",async ev=>{
+ const directoryRole=ev.target.closest("[data-directory-role]");
+ if(directoryRole){
+  if(previewReadOnly()||!canEdit())return;
+  const id=directoryRole.dataset.directoryRole,role=directoryRole.value;
+  const person=state.data.people.find(p=>String(p.id)===id);
+  const current=person?.role,actor=effectiveRole();
+  const self=state.mode==="demo"?id==="preview-owner":id===state.user?.id;
+  if(!person||!roleOptionsForManager(actor,current,self).includes(role))return toast("That role is outside your authority.");
+  if(role===current)return;
+  if(!window.confirm("Change "+person.name+"'s role to "+roleLabels[role]+"?")){directoryRole.value=current;return;}
+  try{
+   if(state.mode==="demo"){person.role=role;save(state.team,state.data);render();}
+   else{await updateMemberRole(state.team,id,role);await refresh(true);}
+   toast("Member role updated.");
+  }catch(err){
+   directoryRole.value=current;
+   toast("Role update failed: "+(err.message||"Access denied"));
+   if(state.mode==="live")await refresh(true);
+  }
+  return;
+ }
  const partStatus=ev.target.closest("[data-part-status]");
  if(partStatus){
   if(previewReadOnly()||!canEdit())return toast("Only a Lead or above can update manufacturing progress.");
@@ -1062,7 +1083,7 @@ app.addEventListener("change",async ev=>{
   const next=roleSelection.value;
   state.rolePreview=roleIsPreviewable(next)?next:null;
   state.modal=null;
-  if(!canAdmin()&&["admin","safety"].includes(state.view))state.view="overview";
+  if((!canAdmin()&&state.view==="admin")||(!canEdit()&&state.view==="safety"))state.view="overview";
   render();return;
  }
  if(previewReadOnly())return toast("Exit role preview before modifying member access.");
@@ -1079,7 +1100,7 @@ app.addEventListener("change",async ev=>{
  }catch(err){toast("Role update failed: "+(err.message||"Unknown error"));await refresh(true);}
 });
 app.addEventListener("submit",async ev=>{
- const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form","profile-form","report-form","reference-form","part-form","stock-form","bom-form","milestone-form","dependency-form","checklist-form"].includes(form.id))return;
+ const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form","profile-form","report-form","reference-form","part-form","stock-form","bom-form","milestone-form","dependency-form","checklist-form","role-request-form"].includes(form.id))return;
  ev.preventDefault();if(previewReadOnly())return toast("Role preview is read-only. Exit preview to save changes.");const f=new FormData(form);
  try{
  if(form.id==="magic-link-form"){
@@ -1091,7 +1112,15 @@ app.addEventListener("submit",async ev=>{
  if(form.id==="request-form"){
   const name=String(f.get("name")||"").trim().slice(0,80),subgroup=String(f.get("subgroup")||"");
   if(!name||!groups.includes(subgroup))return toast("Enter a valid name and subgroup.");
-  await requestMembership(state.team,state.user,name,subgroup);await refresh();toast("Access request submitted.");return;
+  const outcome=await requestMembership(state.team,state.user,name,subgroup);await refresh();toast(outcome==="approved"?"Welcome to the team. You joined as a Member.":"Access request sent to the team administrator.");return;
+ }
+ if(form.id==="role-request-form"){
+  if(state.mode!=="live"||state.member?.status!=="approved")return;
+  const requested=String(f.get("requested_role")||""),reason=String(f.get("reason")||"").trim().slice(0,500);
+  if(!["lead","mentor","captain","admin"].includes(requested)||roleTiers[requested]<=(roleTiers[actualRole()]||0))return toast("Choose a higher role.");
+  await requestHigherRole(state.team,requested,reason,state.user.id);
+  state.modal=null;state.view="people";await refresh(true);
+  toast("Your role request was sent to team leaders.");return;
  }
  if(form.id==="dependency-form"){
   if(!canEdit())return toast("Only team Leads can manage task prerequisites.");
