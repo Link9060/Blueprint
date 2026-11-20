@@ -1,12 +1,12 @@
 import {teams,groups,channels,workspace,save,reset,progress} from "./data.js";
-import {roleLabels,rolePreviewOptions,canManageTeam,canManageWork,roleIsPreviewable} from "./roles.js";
+import {roleLabels,rolePreviewOptions,canManageTeam,canManageWork,roleIsPreviewable,roleTiers,roleOptionsForManager} from "./roles.js";
 import {avatarColors,avatarColorNames,avatarClass,localDateTime} from "./profile.js";
 import {safeReferenceUrl,reportReasons,fabricationMethods,fabricationStatuses,fabricationLabels,fabricationStatusLabels,engineeringKinds} from "./engineering.js";
 import {inventoryUnits,milestoneStatuses,milestoneLabels,stockCoverage,milestonesFor,milestoneProgress,validQuantity} from "./planning.js";
 import {preparationCategories,preparationLabels,taskPrerequisites,taskBlockers,wouldCreateCycle,eventPreparation,preparationProgress} from "./coordination.js";
 import {patchHtml} from "./dom-patch.js";
 import {installMotion,celebrateTask} from "./motion.js";
-import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,editLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,editLiveEvent,addLiveAnnouncement,getLiveProfile,saveLiveProfile,updateOwnSubgroup,subscribeTeam,reportTeamMessage,reviewTeamReport,setMessageVisibility,createEngineeringLink,deleteEngineeringLink,requestPart,setPartStatus,createInventoryItem,updateInventoryItem,createBomLine,updateBomLine,removeBomLine,createProjectMilestone,updateProjectMilestone,removeProjectMilestone,addTaskDependency,removeTaskDependency,addEventChecklistItem,editEventChecklistItem,setChecklistStatus,deleteEventChecklistItem} from "./supabase.js";
+import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,editLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,editLiveEvent,addLiveAnnouncement,removeLiveAnnouncement,removeLiveLog,requestHigherRole,decideHigherRole,getLiveProfile,saveLiveProfile,updateOwnSubgroup,subscribeTeam,reportTeamMessage,reviewTeamReport,setMessageVisibility,createEngineeringLink,deleteEngineeringLink,requestPart,setPartStatus,createInventoryItem,updateInventoryItem,createBomLine,updateBomLine,removeBomLine,createProjectMilestone,updateProjectMilestone,removeProjectMilestone,addTaskDependency,removeTaskDependency,addEventChecklistItem,editEventChecklistItem,setChecklistStatus,deleteEventChecklistItem} from "./supabase.js";
 
 const app=document.getElementById("app");
 const state={team:sessionStorage.getItem("blueprint-selected-team")||null,view:"overview",filter:"all",channel:"general",modal:null,menu:false,editingTaskId:null,editingProjectId:null,editingLogId:null,editingEventId:null,editingStockId:null,editingBomId:null,editingMilestoneId:null,planningProjectId:null,dependencyTaskId:null,checklistEventId:null,editingChecklistId:null,reportMessageId:null,linkProjectId:null,profile:null,authNotice:"",unsubscribe:null,subscriptionTeam:null,refreshBusy:false,realtimeTimer:null,taskScope:"all",rolePreview:null,mode:configured()?"live":"demo",user:null,member:null,data:null,loading:false,error:""};
@@ -183,7 +183,7 @@ function renderTasks(){
 function renderLogs(){
  const entries=state.data.logs.map(l=>
   '<article class="log"><div class="record-title"><h3>'+e(l.title)+'</h3>'+
-  (canEdit()?'<button type="button" class="btn small record-edit" data-edit-log="'+e(l.id)+'">'+icon("pencil",13)+' Edit</button>':"")+
+  (canEdit()?'<div class="record-controls"><button type="button" class="btn small record-edit" data-edit-log="'+e(l.id)+'">'+icon("pencil",13)+' Edit</button><button type="button" class="btn small" data-remove-log="'+e(l.id)+'">Remove</button></div>':"")+
   '</div><p>'+e(l.body)+'</p><small>'+e(l.subgroup)+' · '+e(l.author)+' · '+e(l.time)+
   (l.edited_at?' · Edited by '+e(l.edited_by||"Team lead"):"")+'</small></article>'
  ).join("");
@@ -259,13 +259,30 @@ function renderInventory(){
 }
 
 function renderPeople(){
- const cards=state.data.people.map(p=>
-  '<article class="card person">'+avatarHtml(p.name,p.avatar_color)+
-  '<div class="person-details"><h3>'+e(p.name)+'</h3><small>'+e(roleLabels[p.role]||p.role)+' · '+e(p.group)+'</small>'+
-  (p.headline?'<p class="person-headline">'+e(p.headline)+'</p>':"")+
-  (p.bio?'<p class="person-bio">'+e(p.bio)+'</p>':"")+'</div></article>'
- ).join("");
- return heading("PEOPLE & ROLES","Team directory","Find the right person or subgroup for the next step.")+sampleNote()+'<div class="people">'+(cards||'<div class="empty">The directory will populate when members join.</div>')+'</div>';
+ const actorRole=effectiveRole();
+ const currentId=state.mode==="demo"?"preview-owner":state.user?.id;
+ const cards=state.data.people.map(p=>{
+  const choices=canEdit()&&!previewReadOnly()?roleOptionsForManager(actorRole,p.role,p.id===currentId):[];
+  const controls=choices.length?'<div class="directory-role"><label for="directory-'+e(p.id)+'">TEAM ROLE</label><select id="directory-'+e(p.id)+'" class="field" data-directory-role="'+e(p.id)+'" aria-label="Role of '+e(p.name)+'">'+
+   choices.map(r=>'<option value="'+r+'" '+(p.role===r?"selected":"")+'>'+e(roleLabels[r])+'</option>').join("")+'</select></div>':
+   '<span class="directory-role-label">'+e(roleLabels[p.role]||p.role)+(p.role==="owner"?" · Protected":"")+'</span>';
+  return '<article class="card person">'+avatarHtml(p.name,p.avatar_color)+
+   '<div class="person-details"><h3>'+e(p.name)+'</h3><small>'+e(p.group)+'</small>'+
+   (p.headline?'<p class="person-headline">'+e(p.headline)+'</p>':"")+
+   (p.bio?'<p class="person-bio">'+e(p.bio)+'</p>':"")+controls+'</div></article>';
+ }).join("");
+ const ownRequests=(state.data.roleRequests||[]).filter(r=>r.requester_id===state.user?.id);
+ const pending=(state.data.roleRequests||[]).filter(r=>r.status==="pending"&&r.requester_id!==state.user?.id);
+ const queue=canEdit()?pending.map(r=>{
+  const person=state.data.people.find(p=>p.id===r.requester_id);
+  const allowed=roleOptionsForManager(actorRole,person?.role||"member",false).includes(r.requested_role);
+  return '<article class="card directory-request"><div><b>'+e(person?.name||"Member")+'</b><small>Requests '+e(roleLabels[r.requested_role]||r.requested_role)+'</small><p>'+e(r.reason||"No reason supplied")+'</p></div>'+
+   (allowed?'<div class="request-actions"><button class="btn small" data-role-request-decision="'+e(r.id)+'" data-decision-role="declined">Decline</button><button class="btn primary small" data-role-request-decision="'+e(r.id)+'" data-decision-role="approved">Approve</button></div>':'<small class="hint">Higher-ranking approval required</small>')+'</article>';
+ }).join(""):"";
+ return heading("PEOPLE & ROLES","Team directory","Find your team and manage roles with rank-limited permissions.",state.mode==="live"&&(roleTiers[actualRole()]||0)<4?button("Request higher role","request-role"):"")+
+  sampleNote()+'<div class="people">'+(cards||'<div class="empty">No members to show.</div>')+'</div>'+
+  (ownRequests.length?'<p class="hint">Your role requests: '+ownRequests.slice(0,3).map(r=>e(roleLabels[r.requested_role])+' ('+e(r.status)+')').join(" · ")+'</p>':"")+
+  (canEdit()&&pending.length?'<section class="directory-requests"><h2>Requests for higher roles</h2>'+queue+'</section>':"");
 }
 function renderCalendar(){
  const cards=state.data.events.map(ev=>{
@@ -291,8 +308,12 @@ function renderCalendar(){
 }
 
 function renderAnnouncements(){
- const cards=(state.data.announcements||[]).map(x=>'<article class="card pad" style="margin-bottom:12px"><div class="eyebrow">'+e(x.author)+' · '+e(x.time)+'</div><h3 style="font-size:15px;letter-spacing:-.3px;margin:12px 0 6px">'+e(x.title)+'</h3><p style="font-size:12px;line-height:1.8;color:#75838a;white-space:pre-wrap;margin:0">'+e(x.body)+'</p></article>').join("");
- return heading("TEAM UPDATES","Announcements","Important information, without getting lost in a conversation.",canEdit()?button(icon("plus",15)+" Publish update","new-announcement","primary"):"")+sampleNote()+(cards||'<div class="empty">Nothing posted yet. Team leads can publish the first update.</div>');
+ const cards=(state.data.announcements||[]).map(x=>
+  '<article class="card pad announcement-card" data-dom-key="announcement-'+e(x.id)+'"><div class="record-title"><div class="eyebrow">'+e(x.author)+' · '+e(x.time)+'</div>'+
+  (canEdit()&&!previewReadOnly()?'<button type="button" class="btn small" data-remove-announcement="'+e(x.id)+'">Remove</button>':"")+'</div>'+
+  '<h3>'+e(x.title)+'</h3><p>'+e(x.body)+'</p></article>').join("");
+ return heading("TEAM UPDATES","Announcements","Important information, without getting lost in a conversation.",canEdit()?button(icon("plus",15)+" Publish update","new-announcement","primary"):"")+sampleNote()+
+  (cards||'<div class="empty">Nothing posted yet. Team leads can publish the first update.</div>');
 }
 
 function canAdmin(){return canManageTeam(effectiveRole());}
@@ -305,24 +326,30 @@ function renderAdmin(){
 }
 
 function renderMessages(){
- const messages=(state.data.messages[state.channel]||[]).filter(m=>!m.hidden||canAdmin()).map(m=>{
-  const moderator=canAdmin();
-  return '<div class="message '+(m.hidden?"message-muted":"")+'"><div class="avatar">'+e(m.initials||initials(m.author))+'</div>'+
-   '<div class="message-content"><div class="message-header"><b>'+e(m.author)+'</b><small>'+e(m.time)+'</small></div>'+
-   (m.hidden?'<small class="moderation-label">Hidden by a team moderator · visible to administrators</small>':"")+
+ const list=(state.data.messages[state.channel]||[]).filter(m=>!m.hidden||canEdit());
+ const messages=list.map(m=>{
+  const moderator=canEdit();
+  const mine=state.mode==="demo"?m.author==="You (preview)":m.author_id===state.user?.id;
+  return '<div class="message '+(mine?"message-own ":"")+(m.hidden?"message-muted":"")+'" data-dom-key="message-'+e(m.id)+'">'+
+   '<div class="avatar">'+e(m.initials||initials(m.author))+'</div>'+
+   '<div class="message-content"><div class="message-header"><b>'+e(m.author)+(mine?" · You":"")+'</b><small>'+e(m.time)+'</small></div>'+
+   (m.hidden?'<small class="moderation-label">Hidden · visible to team moderators only</small>':"")+
    '<p>'+e(m.text)+'</p><div class="message-actions">'+
    (!m.hidden?'<button type="button" class="subtle-action" data-report-message="'+e(m.id)+'">Report</button>':"")+
    (moderator?'<button type="button" class="subtle-action" data-message-visibility="'+e(m.id)+'" data-visible="'+(m.hidden?"yes":"no")+'">'+(m.hidden?"Restore":"Hide")+'</button>':"")+
    '</div></div></div>';
  }).join("");
- return heading("CONVERSATIONS","Team messages","Subgroup channels with a private, administrator-reviewed report option.")+
+ return heading("CONVERSATIONS","Team messages","Communicate by subgroup. Leads and above can moderate reported messages.")+
   sampleNote()+'<div class="card chat"><aside class="channels"><h3>CHANNELS</h3>'+
   channels.map(c=>'<button class="channel '+(state.channel===c?"active":"")+'" data-channel="'+c+'"># '+e(c)+'</button>').join("")+
-  '</aside><section class="conversation"><div class="chat-head"><b># '+e(state.channel)+'</b><small>Team '+e(state.team)+
-  ' · '+(state.mode==="demo"?"Local preview":"Team channel")+'</small></div><div class="messages">'+
-  (messages||'<div class="empty">Start the conversation.</div>')+'</div>'+
-  '<form class="compose" id="compose-form" data-form-context="'+e(state.channel)+'"><input class="field" name="body" maxlength="1000" placeholder="Message #'+e(state.channel)+
-  '" aria-label="Message" required><button class="btn primary" type="submit">Send '+icon("arrow",14)+'</button></form></section></div>';
+  '</aside><section class="conversation"><div class="chat-head"><div><b># '+e(state.channel)+'</b><small>Team '+e(state.team)+' · '+(state.mode==="demo"?"Sample workspace":"Team channel")+'</small></div>'+
+  '<span class="chat-indicator">'+(state.mode==="live"?"● LIVE":"◌ DEMO")+'</span></div>'+
+  '<div class="messages" role="log" aria-label="Messages in '+e(state.channel)+'" aria-live="polite">'+
+  (messages||'<div class="empty chat-empty">No messages here yet. Start the conversation.</div>')+'</div>'+
+  '<form class="compose" id="compose-form" data-form-context="'+e(state.channel)+'">'+
+  '<label class="sr-only" for="compose-message">Message</label><textarea id="compose-message" class="field" name="body" maxlength="1000" rows="2" placeholder="Message #'+e(state.channel)+'" required></textarea>'+
+  '<button class="btn primary" type="submit">Send '+icon("arrow",14)+'</button></form>'+
+  '<div class="chat-compose-hint">ENTER TO SEND · SHIFT + ENTER FOR NEW LINE</div></section></div>';
 }
 function renderManufacturing(){
  const requests=state.data.partRequests||[];
@@ -338,7 +365,7 @@ function renderManufacturing(){
   sampleNote()+'<div class="manufacture-board">'+(cards||'<div class="empty">No manufacturing requests yet.</div>')+'</div>';
 }
 function renderSafety(){
- if(!canAdmin())return heading("TEAM SAFETY","Restricted","Only team administrators can review reports and activity history.");
+ if(!canEdit())return heading("TEAM SAFETY","Restricted","Only team Leads and above can review reports and activity history.");
  const reports=state.data.reports||[];
  const open=reports.filter(r=>r.status==="open");
  const resolved=reports.filter(r=>r.status!=="open");
@@ -358,7 +385,7 @@ function renderSafety(){
   '<small>'+e(new Date(x.created_at).toLocaleString())+'</small></div>'
  ).join("");
  return heading("TEAM SAFETY","Moderation & activity","Review reports, hide harmful messages in team channels and inspect an append-only history.")+
-  sampleNote()+notice('Reports are private. Only team administrators can review them. Messages are hidden rather than deleted so records remain available for review.')+
+  sampleNote()+notice('Reports are private. Only team Leads and above can review them. Messages are hidden rather than deleted so records remain available for review.')+
   section("Needs review",'<span class="pill">'+open.length+' open</span>',
    open.map(reportCard).join("")||'<div class="empty">No outstanding reports.</div>')+
   '<div class="dashboard-spacer"></div>'+
@@ -385,19 +412,19 @@ function renderProfile(){
   '<div class="form-group"><label for="profile-headline">Short headline</label><input id="profile-headline" class="field" name="headline" maxlength="80" value="'+e(p.headline||"")+'" placeholder="e.g. CAD and manufacturing"></div>'+
   '<div class="form-group"><label for="profile-bio">About you</label><textarea id="profile-bio" class="field" name="bio" maxlength="300" placeholder="Skills, projects and interests you want teammates to know">'+e(p.bio||"")+'</textarea><small class="field-help">Up to 300 characters. Keep private contact information out of your bio.</small></div>'+
   '<fieldset class="profile-palette"><legend>Avatar color</legend><div class="profile-swatches">'+colors+'</div></fieldset>'+
-  '<div class="profile-form-footer"><span class="field-help">Your role is managed by team administrators. Your email is not shown to other members.</span>'+
+  '<div class="profile-form-footer"><span class="field-help">Request a higher role from the Team Directory. Only eligible leaders can approve it. Your email stays private.</span>'+
   '<button type="submit" class="btn primary" '+(previewReadOnly()?"disabled":"")+'>'+icon("check",15)+' Save profile</button></div></form>';
  return heading("PERSONALIZE","My profile","Choose how your teammates see you while keeping your account secure.")+sampleNote()+card+form;
 }
 
 function renderSettings(){
  const inspector=mayPreview()?'<div class="setting-row"><div><b>Role inspector</b><small>See what each role sees without changing real permissions. Use separate test accounts to verify server-side access.</small></div>'+previewSelector("settings")+'</div>':"";
- return heading("PREFERENCES","Workspace settings","Your current team and preview configuration.")+'<section class="card pad"><div class="setting-row"><div><b>Current team</b><small>'+e(currentTeam().name)+' · Team '+e(state.team)+'</small></div>'+button("Switch team","switch-team")+'</div><div class="setting-row"><div><b>Data connection</b><small>'+(state.mode==="demo"?"Demo data is stored in this browser only.":"Connected to a configured Supabase project.")+'</small></div><span class="pill">'+(state.mode==="demo"?"Demo":"Supabase")+'</span></div><div class="setting-row"><div><b>Google authentication</b><small>'+(state.mode==="demo"?"Sign-in is simulated in sample mode.":"Email sign-in is coded. Google sign-in requires provider setup in Supabase.")+'</small></div><span class="pill">'+(state.mode==="demo"?"Sample":"Review settings")+'</span></div>'+'<div class="setting-row"><div><b>My profile</b><small>Change your name, bio, subgroup and avatar.</small></div>'+button("Customize profile","open-profile","primary")+'</div>'+(state.mode==="demo"?'<div class="setting-row"><div><b>Reset sample changes</b><small>Restore the original fictional tasks, build logs and messages.</small></div>'+button("Reset preview","reset")+'</div><div class="setting-row"><div><b>Connect to live Blueprint</b><small>Leave the fictional sample workspace and sign into your real team.</small></div>'+button("Go live","exit-preview","primary")+'</div>':"")+inspector+'</section>';
+ return heading("PREFERENCES","Workspace settings","Your current team and preview configuration.")+'<section class="card pad"><div class="setting-row"><div><b>Current team</b><small>'+e(currentTeam().name)+' · Team '+e(state.team)+'</small></div>'+button("Switch team","switch-team")+'</div><div class="setting-row"><div><b>Data connection</b><small>'+(state.mode==="demo"?"Demo data is stored in this browser only.":"Connected to a configured Supabase project.")+'</small></div><span class="pill">'+(state.mode==="demo"?"Demo":"Supabase")+'</span></div><div class="setting-row"><div><b>Google authentication</b><small>'+(state.mode==="demo"?"Sign-in is simulated in sample mode.":"School Google accounts may join as Members when their domain is allowlisted; other accounts need team review.")+'</small></div><span class="pill">'+(state.mode==="demo"?"Sample":"Review settings")+'</span></div>'+'<div class="setting-row"><div><b>My profile</b><small>Change your name, bio, subgroup and avatar.</small></div>'+button("Customize profile","open-profile","primary")+'</div>'+(state.mode==="demo"?'<div class="setting-row"><div><b>Reset sample changes</b><small>Restore the original fictional tasks, build logs and messages.</small></div>'+button("Reset preview","reset")+'</div><div class="setting-row"><div><b>Connect to live Blueprint</b><small>Leave the fictional sample workspace and sign into your real team.</small></div>'+button("Go live","exit-preview","primary")+'</div>':"")+inspector+'</section>';
 }
 function canEdit(){return canManageWork(effectiveRole());}
 function sidebar(){
  const navigation=a("overview","Overview","overview")+a("announcements","Announcements","bell")+a("tasks","Tasks","tasks")+a("logs","Build log","logs")+a("projects","Robot projects","projects")+a("manufacturing","Manufacturing","projects")+a("inventory","Inventory","projects")+a("messages","Messages","messages")+a("calendar","Calendar","calendar")+a("people","Members","people");
- return '<div class="screen '+(state.menu?"show":"")+'" data-action="close-menu"></div><aside class="side '+(state.menu?"open":"")+'"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><button class="team-picker" data-action="switch-team"><span class="team-box">'+e(state.team)+'</span><span><b>'+e(currentTeam().name)+'</b><small>Team workspace</small></span><span class="chev">'+icon("chevron",14)+'</span></button>'+previewSelector("sidebar")+'<div class="side-caption">WORKSPACE</div><nav class="nav" aria-label="Workspace">'+navigation+'</nav><div class="side-caption">GENERAL</div><nav class="nav" aria-label="General">'+(canAdmin()?a("admin","Membership","people")+a("safety","Moderation","info"):"")+a("profile","My profile","people")+a("settings","Settings","settings")+'</nav><div class="side-bottom">'+avatarHtml(currentProfile().full_name||state.user?.user_metadata?.full_name||"Preview User",currentProfile().avatar_color)+'<div><b>'+(state.mode==="demo"?"Preview user":e(currentProfile().full_name||state.user?.user_metadata?.full_name||"Team member"))+'</b><small>'+(state.mode==="demo"?"Demo workspace":e(roleLabels[actualRole()]||"Member"))+'</small></div><button class="push" data-action="sign-out" aria-label="Leave workspace">'+icon("logout",17)+'</button></div></aside>';
+ return '<div class="screen '+(state.menu?"show":"")+'" data-action="close-menu"></div><aside class="side '+(state.menu?"open":"")+'"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><button class="team-picker" data-action="switch-team"><span class="team-box">'+e(state.team)+'</span><span><b>'+e(currentTeam().name)+'</b><small>Team workspace</small></span><span class="chev">'+icon("chevron",14)+'</span></button>'+previewSelector("sidebar")+'<div class="side-caption">WORKSPACE</div><nav class="nav" aria-label="Workspace">'+navigation+'</nav><div class="side-caption">GENERAL</div><nav class="nav" aria-label="General">'+(canAdmin()?a("admin","Membership","people"):"")+(canEdit()?a("safety","Moderation","info"):"")+a("profile","My profile","people")+a("settings","Settings","settings")+'</nav><div class="side-bottom">'+avatarHtml(currentProfile().full_name||state.user?.user_metadata?.full_name||"Preview User",currentProfile().avatar_color)+'<div><b>'+(state.mode==="demo"?"Preview user":e(currentProfile().full_name||state.user?.user_metadata?.full_name||"Team member"))+'</b><small>'+(state.mode==="demo"?"Demo workspace":e(roleLabels[actualRole()]||"Member"))+'</small></div><button class="push" data-action="sign-out" aria-label="Leave workspace">'+icon("logout",17)+'</button></div></aside>';
 }
 function shell(){
  const views={overview:renderOverview,announcements:renderAnnouncements,tasks:renderTasks,logs:renderLogs,projects:renderProjects,messages:renderMessages,calendar:renderCalendar,people:renderPeople,admin:renderAdmin,safety:renderSafety,manufacturing:renderManufacturing,inventory:renderInventory,profile:renderProfile,settings:renderSettings};
@@ -411,9 +438,9 @@ function authPage(){
  const t=currentTeam();
  const subtitle=state.error?notice('<b>Connection issue:</b> '+e(state.error)):"";
  const message=state.authNotice?notice('<b>Email sent.</b> '+e(state.authNotice)):"";
- const form=state.user?'<form id="request-form"><div class="form-group"><label for="join-name">Your name</label><input id="join-name" class="field" name="name" maxlength="80" required placeholder="First and last name" value="'+e(state.user.user_metadata?.full_name||"")+'"></div><div class="form-group"><label for="join-group">Subgroup</label><select id="join-group" class="field" name="subgroup">'+groups.map(x=>'<option>'+e(x)+'</option>').join("")+'</select></div><button class="btn primary" type="submit">Request team access</button></form>':
+ const form=state.user?'<form id="request-form"><div class="form-group"><label for="join-name">Your name</label><input id="join-name" class="field" name="name" maxlength="80" required placeholder="First and last name" value="'+e(state.user.user_metadata?.full_name||"")+'"></div><div class="form-group"><label for="join-group">Subgroup</label><select id="join-group" class="field" name="subgroup">'+groups.map(x=>'<option>'+e(x)+'</option>').join("")+'</select></div><button class="btn primary" type="submit">Join team as Member</button></form>':
    '<button class="btn primary" data-action="google-signin">Continue with Google →</button><p class="small-muted" style="text-align:center;margin:18px 0 7px">or sign in by email</p><form id="magic-link-form"><label for="auth-email" class="sr-only">Email address</label><input id="auth-email" name="email" class="field" type="email" autocomplete="email" placeholder="School or personal email" maxlength="254" required><button class="btn" style="width:100%;margin-top:10px" type="submit">Send sign-in link</button></form>'+message;
- return '<div class="landing"><div class="landing-top"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div>'+button("Switch team","switch-team")+'</div><main class="landing-inner signin"><span class="team-box">'+e(t.id)+'</span><span class="eyebrow">'+e(t.name)+'</span><h1>'+(!state.user?"Welcome to Blueprint.":"Join the workspace.")+'</h1><p>'+(!state.user?"Sign in to request access to your private team workspace. A mentor or team administrator must approve every new member.":"Choose your subgroup and request approval from a team administrator.")+'</p>'+subtitle+form+'<div class="access-actions">'+button("Explore sample workspace","open-preview")+(state.user?button("Sign out / switch account","sign-out"):"")+'</div></main></div>';
+ return '<div class="landing"><div class="landing-top"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div>'+button("Switch team","switch-team")+'</div><main class="landing-inner signin"><span class="team-box">'+e(t.id)+'</span><span class="eyebrow">'+e(t.name)+'</span><h1>'+(!state.user?"Welcome to Blueprint.":"Join the workspace.")+'</h1><p>'+(!state.user?"Sign in with Google to access your team. Verified school accounts can enter as Members when their email domain is authorized; other accounts request access.":"Choose your subgroup. Authorized school Google accounts join immediately as Members. Other accounts will be reviewed by a team administrator.")+'</p>'+subtitle+form+'<div class="access-actions">'+button("Explore sample workspace","open-preview")+(state.user?button("Sign out / switch account","sign-out"):"")+'</div></main></div>';
 }
 
 function waitingPage(){
@@ -471,6 +498,15 @@ function modal(){
    '<input id="event-time" type="datetime-local" name="start" class="field" required value="'+e(localDateTime(record?.starts_at))+'"></div>'+
    '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">'+(editing?"Save changes":"Schedule event")+'</button></div></form>';
 
+ }else if(state.modal==="role-request"){
+  const choices=["lead","captain","mentor","admin"].filter(role=>(roleTiers[role]||0)>(roleTiers[actualRole()]||0));
+  if(!choices.length)return "";
+  title="Request a higher role";
+  description="A team leader will review your request. Your current permissions stay unchanged.";
+  body='<form id="role-request-form"><div class="form-group"><label for="requested-role">Requested role</label><select id="requested-role" name="requested_role" class="field" required>'+
+   choices.map(r=>'<option value="'+r+'">'+e(roleLabels[r])+'</option>').join("")+'</select></div>'+
+   '<div class="form-group"><label for="request-reason">Why do you need this access?</label><textarea id="request-reason" name="reason" class="field" maxlength="500" rows="4" placeholder="Describe which team responsibilities you need to manage"></textarea></div>'+
+   '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Send request</button></div></form>';
  }else if(state.modal==="announcement"){
   title="Publish an announcement";description="This update will be visible to every approved member of this team.";
   body='<form id="announcement-form"><div class="form-group"><label for="announce-title">Title</label><input id="announce-title" name="title" class="field" maxlength="140" required placeholder="Short, clear headline"></div><div class="form-group"><label for="announce-body">Message</label><textarea id="announce-body" name="body" class="field" maxlength="2000" required placeholder="What does everyone need to know?"></textarea></div><div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Publish announcement</button></div></form>';
@@ -635,6 +671,9 @@ function render(){
  const previousMain=app.querySelector?.(".main");
  const previousTop=previousMain?.scrollTop||0;
  const sameView=state.renderScrollKey===scrollKey;
+ const oldChat=app.querySelector?.(".messages");
+ const chatKey=state.team+":"+state.channel;
+ const pinChat=state.view==="messages"&&(!oldChat||state.lastChatKey!==chatKey||((oldChat.scrollHeight||0)-(oldChat.scrollTop||0)-(oldChat.clientHeight||0)<95));
  const markup=shell()+modal();
  // Reconcile the existing shell for menus, saves and incoming realtime changes.
  // Minimal non-browser test environments continue to use the legacy fallback.
@@ -642,6 +681,11 @@ function render(){
  state.renderScrollKey=scrollKey;
  const nextMain=app.querySelector?.(".main");
  if(nextMain)nextMain.scrollTop=sameView?previousTop:0;
+ if(state.view==="messages"){
+  const chat=app.querySelector?.(".messages");
+  if(chat&&pinChat)chat.scrollTop=chat.scrollHeight||0;
+  state.lastChatKey=chatKey;
+ }
 }
 function toast(text){
  document.querySelector(".toast")?.remove();
@@ -658,7 +702,7 @@ async function refresh(quiet=false){
  if(state.mode==="demo"){state.data=workspace(state.team);render();return;}
  if(state.refreshBusy)return;
  state.refreshBusy=true;
- const previousDraft=quiet?document.querySelector("#compose-form input")?.value:null;
+ const previousDraft=quiet?document.querySelector("#compose-form textarea")?.value:null;
  const requestedTeam=state.team;
  // Keep the current workspace visible during saves and refreshes.
  // Only first-time loading needs the full-screen state.
@@ -668,6 +712,18 @@ async function refresh(quiet=false){
   if(state.team!==requestedTeam)return;
   state.user=user;
   state.member=user?await membership(requestedTeam,user.id):null;
+  // School-domain-verified Google users can be added as basic Members by RLS.
+  // Non-allowlisted Google accounts remain on the team join screen.
+  if(user&&!state.member&&state.mode==="live"&&user.email_confirmed_at&&
+      (user.app_metadata?.provider==="google"||user.app_metadata?.providers?.includes("google"))){
+   try{
+    const suggested=String(user.user_metadata?.full_name||user.email?.split("@")[0]||"Team member").trim().slice(0,80);
+    await requestMembership(requestedTeam,user,suggested||"Team member","Design",false);
+    state.member=await membership(requestedTeam,user.id);
+   }catch(err){
+    state.error=err.message||"Automatic team entry unavailable.";
+   }
+  }
   state.profile=user?await getLiveProfile(user.id):null;
   if(state.mode==="live"&&state.member?.role!=="owner")state.rolePreview=null;
   state.data=state.member?.status==="approved"?await liveWorkspace(requestedTeam):null;
@@ -691,7 +747,7 @@ async function refresh(quiet=false){
   state.loading=false;state.refreshBusy=false;
   render();
   if(quiet&&previousDraft!=null){
-   const input=document.querySelector("#compose-form input");
+   const input=document.querySelector("#compose-form textarea");
    if(input)input.value=previousDraft;
   }
  }
@@ -726,6 +782,7 @@ async function dispatchAction(action){
  if(action==="new-project"){if(!canEdit())return;state.editingProjectId=null;state.modal="project";render();return;}
  if(action==="new-event"){if(!canEdit())return;state.editingEventId=null;state.modal="event";render();return;}
  if(action==="new-announcement"){if(!canEdit())return;state.modal="announcement";render();return;}
+ if(action==="request-role"){if(state.mode!=="live"||!state.member||state.member.status!=="approved")return;state.modal="role-request";render();return;}
  if(action==="new-part"){state.modal="part";render();return;}
  if(action==="new-stock"){if(!canEdit())return;state.editingStockId=null;state.modal="stock";render();return;}
  if(action==="open-profile"){state.view="profile";state.menu=false;state.modal=null;render();return;}
@@ -754,6 +811,51 @@ app.addEventListener("click",async ev=>{
  }
  const project=ev.target.closest("[data-edit-project]");
  if(project&&canEdit()){state.editingProjectId=project.dataset.editProject;state.modal="project-edit";render();return;}
+ const removeAnnouncement=ev.target.closest("[data-remove-announcement]");
+ if(removeAnnouncement){
+  if(previewReadOnly()||!canEdit())return;
+  const id=removeAnnouncement.dataset.removeAnnouncement;
+  if(!window.confirm("Remove this announcement for everyone? This cannot be undone."))return;
+  try{
+   if(state.mode==="demo"){
+    state.data.announcements=state.data.announcements.filter(x=>String(x.id)!==id);
+    save(state.team,state.data);render();
+   }else{await removeLiveAnnouncement(state.team,id);await refresh(true);}
+   toast("Announcement removed.");
+  }catch(err){toast("Could not remove announcement: "+(err.message||"Access denied"));}
+  return;
+ }
+ const removeLog=ev.target.closest("[data-remove-log]");
+ if(removeLog){
+  if(previewReadOnly()||!canEdit())return;
+  const id=removeLog.dataset.removeLog;
+  if(!window.confirm("Permanently remove this build log entry? An audit record will remain."))return;
+  try{
+   if(state.mode==="demo"){
+    state.data.logs=state.data.logs.filter(x=>String(x.id)!==id);
+    save(state.team,state.data);render();
+   }else{await removeLiveLog(state.team,id);await refresh(true);}
+   toast("Build log removed.");
+  }catch(err){toast("Could not remove log: "+(err.message||"Access denied"));}
+  return;
+ }
+ const roleDecision=ev.target.closest("[data-role-request-decision]");
+ if(roleDecision){
+  if(previewReadOnly()||!canEdit()||state.mode!=="live")return;
+  const id=roleDecision.dataset.roleRequestDecision,status=roleDecision.dataset.decisionRole;
+  const request=(state.data.roleRequests||[]).find(r=>String(r.id)===id&&r.status==="pending");
+  const target=state.data.people.find(p=>p.id===request?.requester_id);
+  if(!request||!target||!["approved","declined"].includes(status))return;
+  if(!roleOptionsForManager(effectiveRole(),target.role,false).includes(request.requested_role))return toast("A higher-ranking manager must review this request.");
+  if(!window.confirm(status==="approved"?"Approve "+target.name+" for "+roleLabels[request.requested_role]+"?":"Decline this role request?"))return;
+  try{
+   if(status==="approved")await updateMemberRole(state.team,request.requester_id,request.requested_role);
+   await decideHigherRole(state.team,id,status);
+   await refresh(true);
+   toast(status==="approved"?"Role updated and request approved.":"Request declined.");
+  }catch(err){toast("Could not review role request: "+(err.message||"Access denied"));await refresh(true);}
+  return;
+ }
  const decision=ev.target.closest("[data-decision]");
  if(decision){
   if(previewReadOnly())return toast("Exit role preview before approving members.");
@@ -903,7 +1005,7 @@ app.addEventListener("click",async ev=>{
  }
  const moderate=ev.target.closest("[data-message-visibility]");
  if(moderate){
-  if(previewReadOnly()||!canAdmin())return;
+  if(previewReadOnly()||!canEdit())return;
   const id=moderate.dataset.messageVisibility,visible=moderate.dataset.visible==="yes";
   try{
    if(state.mode==="demo"){
@@ -919,7 +1021,7 @@ app.addEventListener("click",async ev=>{
  }
  const review=ev.target.closest("[data-review-report]");
  if(review){
-  if(previewReadOnly()||!canAdmin())return;
+  if(previewReadOnly()||!canEdit())return;
   const id=review.dataset.reviewReport,status=review.dataset.reportStatus;
   if(!["reviewed","dismissed"].includes(status))return;
   try{
@@ -967,6 +1069,27 @@ app.addEventListener("click",async ev=>{
  if(button){await dispatchAction(button.dataset.action);}
 });
 app.addEventListener("change",async ev=>{
+ const directoryRole=ev.target.closest("[data-directory-role]");
+ if(directoryRole){
+  if(previewReadOnly()||!canEdit())return;
+  const id=directoryRole.dataset.directoryRole,role=directoryRole.value;
+  const person=state.data.people.find(p=>String(p.id)===id);
+  const current=person?.role,actor=effectiveRole();
+  const self=state.mode==="demo"?id==="preview-owner":id===state.user?.id;
+  if(!person||!roleOptionsForManager(actor,current,self).includes(role))return toast("That role is outside your authority.");
+  if(role===current)return;
+  if(!window.confirm("Change "+person.name+"'s role to "+roleLabels[role]+"?")){directoryRole.value=current;return;}
+  try{
+   if(state.mode==="demo"){person.role=role;save(state.team,state.data);render();}
+   else{await updateMemberRole(state.team,id,role);await refresh(true);}
+   toast("Member role updated.");
+  }catch(err){
+   directoryRole.value=current;
+   toast("Role update failed: "+(err.message||"Access denied"));
+   if(state.mode==="live")await refresh(true);
+  }
+  return;
+ }
  const partStatus=ev.target.closest("[data-part-status]");
  if(partStatus){
   if(previewReadOnly()||!canEdit())return toast("Only a Lead or above can update manufacturing progress.");
@@ -989,7 +1112,7 @@ app.addEventListener("change",async ev=>{
   const next=roleSelection.value;
   state.rolePreview=roleIsPreviewable(next)?next:null;
   state.modal=null;
-  if(!canAdmin()&&["admin","safety"].includes(state.view))state.view="overview";
+  if((!canAdmin()&&state.view==="admin")||(!canEdit()&&state.view==="safety"))state.view="overview";
   render();return;
  }
  if(previewReadOnly())return toast("Exit role preview before modifying member access.");
@@ -1005,9 +1128,23 @@ app.addEventListener("change",async ev=>{
   toast("Member role updated.");
  }catch(err){toast("Role update failed: "+(err.message||"Unknown error"));await refresh(true);}
 });
+app.addEventListener("keydown",ev=>{
+ const compose=ev.target?.closest?.("#compose-form textarea");
+ if(!compose||ev.key!=="Enter"||ev.shiftKey||ev.isComposing||ev.ctrlKey||ev.altKey||ev.metaKey)return;
+ ev.preventDefault();
+ compose.form?.requestSubmit?.();
+});
 app.addEventListener("submit",async ev=>{
- const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form","profile-form","report-form","reference-form","part-form","stock-form","bom-form","milestone-form","dependency-form","checklist-form"].includes(form.id))return;
- ev.preventDefault();if(previewReadOnly())return toast("Role preview is read-only. Exit preview to save changes.");const f=new FormData(form);
+ const form=ev.target;if(!["task-form","task-edit-form","log-form","compose-form","request-form","magic-link-form","project-form","event-form","announcement-form","profile-form","report-form","reference-form","part-form","stock-form","bom-form","milestone-form","dependency-form","checklist-form","role-request-form"].includes(form.id))return;
+ ev.preventDefault();if(previewReadOnly())return toast("Role preview is read-only. Exit preview to save changes.");
+ const composing=form.id==="compose-form";
+ if(composing){
+  if(form.dataset.sending==="yes")return;
+  form.dataset.sending="yes";
+  const sendButton=form.querySelector?.('button[type="submit"]');
+  if(sendButton)sendButton.disabled=true;
+ }
+ const f=new FormData(form);
  try{
  if(form.id==="magic-link-form"){
   const email=String(f.get("email")||"").trim();
@@ -1018,7 +1155,15 @@ app.addEventListener("submit",async ev=>{
  if(form.id==="request-form"){
   const name=String(f.get("name")||"").trim().slice(0,80),subgroup=String(f.get("subgroup")||"");
   if(!name||!groups.includes(subgroup))return toast("Enter a valid name and subgroup.");
-  await requestMembership(state.team,state.user,name,subgroup);await refresh();toast("Access request submitted.");return;
+  const outcome=await requestMembership(state.team,state.user,name,subgroup);await refresh();toast(outcome==="approved"?"Welcome to the team. You joined as a Member.":"Access request sent to the team administrator.");return;
+ }
+ if(form.id==="role-request-form"){
+  if(state.mode!=="live"||state.member?.status!=="approved")return;
+  const requested=String(f.get("requested_role")||""),reason=String(f.get("reason")||"").trim().slice(0,500);
+  if(!["lead","mentor","captain","admin"].includes(requested)||roleTiers[requested]<=(roleTiers[actualRole()]||0))return toast("Choose a higher role.");
+  await requestHigherRole(state.team,requested,reason,state.user.id);
+  state.modal=null;state.view="people";await refresh(true);
+  toast("Your role request was sent to team leaders.");return;
  }
  if(form.id==="dependency-form"){
   if(!canEdit())return toast("Only team Leads can manage task prerequisites.");
@@ -1316,9 +1461,18 @@ app.addEventListener("submit",async ev=>{
   const text=String(f.get("body")||"").trim().slice(0,1000);if(!text)return;
   if(state.mode==="demo"){(state.data.messages[state.channel]||=([])).push({id:"demo-message-"+Date.now(),author:"You (preview)",initials:"YP",time:new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),text,hidden:false});save(state.team,state.data);}
   else await sendLiveMessage(state.team,state.channel,text,state.user.id);
+  const textarea=form.querySelector?.('textarea[name="body"]');
+  if(textarea)textarea.value="";
  }
- if(state.mode==="live")await refresh();else render();
+ if(state.mode==="live")await refresh(true);else render();
  }catch(err){toast("Could not save: "+(err.message||"Unknown error"));}
+ finally{
+  if(composing){
+   form.dataset.sending="no";
+   const sendButton=form.querySelector?.('button[type="submit"]');
+   if(sendButton)sendButton.disabled=false;
+  }
+ }
 });
 document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&state.modal){state.modal=null;render();}});
 installMotion(app);

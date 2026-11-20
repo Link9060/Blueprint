@@ -9,15 +9,15 @@ A focused, quietly designed workspace for FRC robotics teams **1810** and **9316
 
 - Private team selection and role-aware member access
 - Google sign-in integration (requires Google OAuth provider setup) and email magic-link option (requires redirect allowlisting)
-- New memberships start **pending** until a trusted team administrator approves them
-- Protected **Owner** role above Admin, provisioned only through verified trusted administration
+- Verified Google identities from explicitly configured school domains join immediately as **Member**; other memberships remain pending until a trusted team administrator approves them
+- Protected **Owner** role above Admin, provisioned only through verified trusted administration; delegated Lead+ role changes are hierarchy-limited
 - Visual-only **role inspector** for Owner and demo, switching among Admin, Captain, Mentor, Lead, and Member
 - Team dashboards with tasks, owners, priorities, statuses, due dates and progress
 - Build logs and subsystem project creation/editing, including updates by Leads, Mentors, Captains, Admins and Owners
 - Calendar event editing by the same leadership roles, with edit attribution
 - Personal profile editor: display name, team subgroup, short headline/bio, and selectable avatar colors
 - Team announcements, meeting and event scheduling
-- Team-scoped channels, with RLS-protected Supabase Realtime updates
+- Team-scoped channels with multiline messages, keyboard sending and RLS-protected Supabase Realtime updates
 - Approved member directory and administrator approval/role editor
 - Fictional sample workspace available without signing in
 - MONO Archive-inspired warm paper workspace and light sidebar with crisp black navigation, editorial typography, understated drafting animations, and reduced-motion support
@@ -92,3 +92,7 @@ See [the non-AI roadmap](docs/NON_AI_ROADMAP.md) for remaining work and launch g
 5. Add permission-controlled storage or CAD-provider integrations after privacy and access reviews.
 6. Finish mobile/browser usability, accessibility, test coverage and monitored pilot rollout.
 7. AI is excluded from the current development scope.
+
+## v8 Lead operations
+
+Lead+ moderation, deletable announcements and build logs with audit events, directory role changes, and trusted Google onboarding are documented in [docs/LEAD_WORKSPACE_V8.md](docs/LEAD_WORKSPACE_V8.md). The trusted-domain allowlist initially contains no domains: only an explicitly vetted school domain can enable direct Member enrollment.

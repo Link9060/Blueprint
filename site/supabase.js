@@ -44,7 +44,7 @@ export async function updateMemberRole(team,userId,role){
  const rows=unwrap(await sb.from("team_memberships").update({role}).eq("team_id",team).eq("user_id",userId).eq("status","approved").select("user_id"));
  if(!rows?.length)throw new Error("Role could not be changed; check administrator access.");
 }
-export async function requestMembership(team,user,fullName,subgroup){
+export async function requestMembership(team,user,fullName,subgroup,allowPending=true){
  if(!teams.find(x=>x.id===team))throw new Error("Unknown team.");
  const sb=await client();
  const profile=await sb.from("profiles").insert({id:user.id,full_name:fullName});
@@ -52,15 +52,30 @@ export async function requestMembership(team,user,fullName,subgroup){
   if(profile.error.code!=="23505")throw profile.error;
   unwrap(await sb.from("profiles").update({full_name:fullName}).eq("id",user.id));
  }
+ const existing=await membership(team,user.id);
+ if(existing)return existing.status;
+ const google=Boolean(user.email_confirmed_at)&&(
+  user.app_metadata?.provider==="google"||user.app_metadata?.providers?.includes("google"));
+ // Only RLS may allow 'approved', and only for domains configured by a trusted
+ // team administrator. Everyone else follows the existing private pending path.
+ if(google){
+  const joined=await sb.from("team_memberships")
+   .insert({team_id:team,user_id:user.id,role:"member",subgroup,status:"approved"});
+  if(!joined.error)return "approved";
+  if(!["42501","PGRST116"].includes(joined.error.code) &&
+     !/row.level.security|permission denied/i.test(joined.error.message||""))throw joined.error;
+ }
+ if(!allowPending)return null;
  unwrap(await sb.from("team_memberships").insert({team_id:team,user_id:user.id,role:"member",subgroup,status:"pending"}));
+ return "pending";
 }
 async function select(team,table,columns="*"){
  const sb=await client();
  return unwrap(await sb.from(table).select(columns).eq("team_id",team).order("created_at",{ascending:false}).limit(table==="messages"?300:200));
 }
 export async function liveWorkspace(team){
- const [taskRows,logRows,projectRows,messageRows,eventRows,memberRows,announcementRows,linkRows,partRows,reportRows,activityRows,stockRows,bomRows,milestoneRows,dependencyRows,checklistRows]=await Promise.all([
-  select(team,"tasks"),select(team,"build_logs"),select(team,"projects"),select(team,"messages"),select(team,"events"),select(team,"team_memberships","user_id,role,subgroup,status,created_at,profiles(full_name,headline,bio,avatar_color)"),select(team,"announcements"),select(team,"project_links"),select(team,"part_requests"),select(team,"message_reports"),select(team,"activity_events"),select(team,"inventory_items"),select(team,"project_bom_items"),select(team,"project_milestones"),select(team,"task_dependencies"),select(team,"event_checklist_items")
+ const [taskRows,logRows,projectRows,messageRows,eventRows,memberRows,announcementRows,linkRows,partRows,reportRows,activityRows,stockRows,bomRows,milestoneRows,dependencyRows,checklistRows,roleRequestRows]=await Promise.all([
+  select(team,"tasks"),select(team,"build_logs"),select(team,"projects"),select(team,"messages"),select(team,"events"),select(team,"team_memberships","user_id,role,subgroup,status,created_at,profiles(full_name,headline,bio,avatar_color)"),select(team,"announcements"),select(team,"project_links"),select(team,"part_requests"),select(team,"message_reports"),select(team,"activity_events"),select(team,"inventory_items"),select(team,"project_bom_items"),select(team,"project_milestones"),select(team,"task_dependencies"),select(team,"event_checklist_items"),select(team,"role_requests")
  ]);
  const people=memberRows.filter(x=>x.status==="approved").map(x=>({id:x.user_id,name:x.profiles?.full_name||"Team member",role:x.role,group:x.subgroup,headline:x.profiles?.headline||"",bio:x.profiles?.bio||"",avatar_color:x.profiles?.avatar_color||"slate",initials:(x.profiles?.full_name||"TM").split(" ").map(a=>a[0]).join("").slice(0,2).toUpperCase()}));
  const nameById=Object.fromEntries(people.map(p=>[p.id,p.name]));
@@ -74,7 +89,7 @@ export async function liveWorkspace(team){
  const partRequests=partRows.map(x=>({id:x.id,project_id:x.project_id,part_name:x.part_name,quantity:x.quantity,method:x.method,status:x.status,notes:x.notes,requested_by:x.requested_by,created_at:x.created_at,updated_at:x.updated_at}));
  const reports=reportRows.map(x=>({id:x.id,message_id:x.message_id,reason:x.reason,note:x.note,status:x.status,reporter_id:x.reporter_id,created_at:x.created_at,reviewed_at:x.reviewed_at}));
  const activity=activityRows.map(x=>({id:x.id,action:x.action,subject_type:x.subject_type,subject_id:x.subject_id,actor:nameById[x.actor_id]||"Team member",created_at:x.created_at}));
- return {team,name:teams.find(x=>x.id===team)?.name||team,tasks,logs,projects,events,messages,announcements,people,projectLinks,partRequests,reports,activity,inventory:stockRows,bom:bomRows,milestones:milestoneRows,taskDependencies:dependencyRows,eventChecklist:checklistRows,pending:memberRows.filter(m=>m.status==="pending").map(m=>({user_id:m.user_id,name:m.profiles?.full_name||"Team member",subgroup:m.subgroup,role:m.role,status:m.status}))};
+ return {team,name:teams.find(x=>x.id===team)?.name||team,tasks,logs,projects,events,messages,announcements,people,roleRequests:roleRequestRows,projectLinks,partRequests,reports,activity,inventory:stockRows,bom:bomRows,milestones:milestoneRows,taskDependencies:dependencyRows,eventChecklist:checklistRows,pending:memberRows.filter(m=>m.status==="pending").map(m=>({user_id:m.user_id,name:m.profiles?.full_name||"Team member",subgroup:m.subgroup,role:m.role,status:m.status}))};
 }
 export async function addLiveTask(team,title,subgroup,userId,assignedTo=null,dueDate=null,priority="Normal"){
  const sb=await client();
@@ -139,6 +154,27 @@ export async function updateOwnSubgroup(team,userId,subgroup){
  const rows=unwrap(await sb.from("team_memberships").update({subgroup})
   .eq("team_id",team).eq("user_id",userId).eq("status","approved").select("user_id"));
  if(!rows?.length)throw new Error("Subgroup update was not permitted.");
+}
+export async function removeLiveAnnouncement(team,id){
+ const sb=await client();
+ const rows=unwrap(await sb.from("announcements").delete().eq("team_id",team).eq("id",id).select("id"));
+ if(!rows?.length)throw new Error("Announcement removal was not authorized.");
+}
+export async function removeLiveLog(team,id){
+ const sb=await client();
+ const rows=unwrap(await sb.from("build_logs").delete().eq("team_id",team).eq("id",id).select("id"));
+ if(!rows?.length)throw new Error("Build log removal was not authorized.");
+}
+export async function requestHigherRole(team,role,reason,userId){
+ if(!["lead","captain","mentor","admin"].includes(role))throw new Error("Choose a valid role.");
+ const sb=await client();
+ unwrap(await sb.from("role_requests").insert({team_id:team,requester_id:userId,requested_role:role,reason:String(reason||"").slice(0,500)}));
+}
+export async function decideHigherRole(team,id,status){
+ if(!["approved","declined"].includes(status))throw new Error("Choose a valid decision.");
+ const sb=await client();
+ const rows=unwrap(await sb.from("role_requests").update({status}).eq("team_id",team).eq("id",id).eq("status","pending").select("id"));
+ if(!rows?.length)throw new Error("Role request could not be reviewed.");
 }
 export async function addLiveAnnouncement(team,title,body,userId){
  const sb=await client();

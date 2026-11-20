@@ -69,6 +69,8 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f database/upgrade_v6_inventory_bom_milestones.sql
       - name: Apply task dependencies and competition checklists
         run: psql -v ON_ERROR_STOP=1 -f database/upgrade_v7_dependencies_competition.sql
+      - name: Apply lead workspace and role security upgrade
+        run: psql -v ON_ERROR_STOP=1 -f database/upgrade_v8_lead_workspace.sql
       - name: Verify team isolation and permissions
         run: |
           psql -v ON_ERROR_STOP=1 -f tests/security.sql
@@ -76,3 +78,4 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f tests/moderation_engineering_security.sql
           psql -v ON_ERROR_STOP=1 -f tests/planning_security.sql
           psql -v ON_ERROR_STOP=1 -f tests/dependencies_competition_security.sql
+          psql -v ON_ERROR_STOP=1 -f tests/lead_workspace_security.sql

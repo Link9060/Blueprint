@@ -680,3 +680,137 @@ button, input, select, textarea { accent-color: var(--mono-ink); }
 @media(prefers-reduced-motion:reduce){
   .btn,.round-button,.nav button,.task-check {transition:none!important}
 }
+
+/* v8: resilient sidebar and readable, lightweight team collaboration. */
+/* Prevent the crowded team picker from shrinking to a single, clipped line. */
+.side>.wordmark,.side>.team-picker,.side>.role-switch,.side>.side-caption,.side>.nav,.side>.side-bottom{
+  flex-shrink:0;
+}
+.side>.team-picker{
+  display:flex;
+  flex:0 0 auto;
+  min-height:66px;
+  width:100%;
+  align-items:center;
+  overflow:hidden;
+}
+.team-picker>.team-box{flex:0 0 40px;width:40px;height:38px}
+.team-picker>span:nth-child(2){display:block;flex:1;min-width:0;overflow:hidden}
+.team-picker b,.team-picker small{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  max-width:100%;
+}
+.team-picker>.chev{flex:0 0 auto;margin-left:0}
+.side{overscroll-behavior-y:contain}
+
+/* Directories show role controls without squeezing member names. */
+.person{align-items:flex-start}
+.person-details{flex:1;min-width:0}
+.directory-role{margin-top:14px;border-top:1px solid var(--mono-line);padding-top:12px;display:flex;align-items:center;gap:10px;justify-content:space-between;flex-wrap:wrap}
+.directory-role label,.directory-role-label{font-size:10px;font-weight:800;letter-spacing:.08em;color:#536055}
+.directory-role-label{display:block;margin-top:10px}
+.directory-role select{min-width:105px;max-width:160px;width:auto;flex:1}
+.directory-requests{margin-top:30px}
+.directory-requests h2{font-size:15px;text-transform:uppercase;letter-spacing:.08em}
+.directory-request{padding:18px 20px;margin-top:10px;display:flex;align-items:center;justify-content:space-between;gap:17px}
+.directory-request b,.directory-request small{display:block}
+.directory-request small{font-size:11px;color:#626963;margin:5px 0}
+.directory-request p{font-size:12px;color:#515c52;line-height:1.6;white-space:pre-wrap;margin:8px 0 0}
+.request-actions,.record-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.record-controls .btn{white-space:nowrap}
+.announcement-card{margin-bottom:12px}
+.announcement-card .record-title{align-items:flex-start}
+.announcement-card h3{font-size:16px;letter-spacing:-.035em;margin:12px 0 8px}
+.announcement-card p{font-size:12px;line-height:1.8;color:#505952;white-space:pre-wrap;margin:0;overflow-wrap:anywhere}
+
+/* Practical chat: one internal scroller, grouped message cards, no WebGL. */
+.chat{height:min(74dvh,750px);min-height:480px;grid-template-columns:220px minmax(0,1fr);overflow:hidden}
+.channels{min-width:0;overflow-y:auto;overscroll-behavior:contain}
+.conversation{min-width:0;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+.chat-head{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.chat-head>div{min-width:0}
+.chat-head b{font-size:15px;overflow-wrap:anywhere}
+.chat-head small{color:#636e64}
+.chat-indicator{font-size:9px;font-weight:800;letter-spacing:.13em;color:#4d745b;white-space:nowrap}
+.messages{
+  flex:1;
+  min-height:0;
+  padding:24px;
+  overflow-y:auto;
+  overscroll-behavior-y:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#aeb2a8 transparent;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.message{
+  max-width:100%;
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:12px 14px;
+  background:#eaeae3;
+  border:1px solid #d0d1c9;
+  border-radius:2px;
+}
+.message-own{background:#dfe4db;border-color:#b9c3b6}
+.message .avatar{flex:none}
+.message-header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.message-header small{margin-left:0}
+.message-content{min-width:0}
+.message-content p,.message p{font-size:12px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;color:#343e35}
+.message-actions{margin-top:8px;gap:15px}
+.message-actions .subtle-action{font-size:10px}
+.message-muted{opacity:.75}
+.chat-empty{margin:auto;width:100%}
+.compose{
+  background:#f3f2ec;
+  border-top:1px solid var(--mono-line);
+  flex:none;
+  display:flex;
+  align-items:end;
+  gap:10px;
+  padding:14px 16px 8px;
+}
+.compose .field{
+  resize:none;
+  flex:1;
+  min-height:46px;
+  max-height:160px;
+  line-height:1.5;
+  padding:11px 13px;
+  overflow-y:auto;
+}
+.compose button{flex:none;min-height:46px}
+.chat-compose-hint{
+  text-align:right;
+  background:#f3f2ec;
+  padding:0 17px 12px;
+  color:#666f66;
+  font-weight:750;
+  letter-spacing:.08em;
+  font-size:9px;
+}
+@media(max-width:800px){
+ .side>.team-picker{min-height:66px}
+ .chat{grid-template-columns:190px minmax(0,1fr)}
+}
+@media(max-width:560px){
+ .chat{height:min(72dvh,690px);min-height:430px;grid-template-columns:1fr}
+ .channels{overflow-x:auto;overflow-y:hidden;white-space:nowrap;display:flex;gap:7px;padding:10px 12px}
+ .channels .channel{min-height:38px}
+ .conversation{min-height:0}
+ .messages{padding:13px;gap:8px}
+ .message{padding:10px;gap:8px}
+ .compose{padding:11px 12px 7px;gap:7px}
+ .compose .field{min-width:0;padding:11px}
+ .compose button{padding:11px 12px;gap:5px}
+ .chat-compose-hint{font-size:8px;padding:0 12px 9px}
+ .directory-request{align-items:stretch;flex-direction:column}
+ .directory-role{align-items:stretch;flex-direction:column}
+ .directory-role select{max-width:none;width:100%}
+}
