@@ -651,3 +651,32 @@ button, input, select, textarea { accent-color: var(--mono-ink); }
 @media (prefers-reduced-motion: reduce) {
   .team-choice, .card, .btn, .nav button, .filter, .channel { transition: none !important; }
 }
+
+/* MONO interaction refinements: responsive before-save feedback, minimal GPU motion. */
+.task-check[aria-busy="true"] {
+  /* The checked state stays visible while Supabase confirms the change. */
+  outline: 2px solid rgba(70,81,72,.32);
+  outline-offset: 3px;
+}
+.task-check.done[aria-busy="true"] {
+  background: #252e28;
+  border-color: #252e28;
+  opacity: 1;
+}
+.entry-main b.strike,.event-checklist-item b.strike {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  color: #747a73;
+}
+@media(hover:hover) and (pointer:fine){
+  .btn:not(:disabled),.round-button:not(:disabled),.nav button:not(:disabled){
+    transition: background-color .15s ease,border-color .15s ease,color .15s ease,transform .18s ease-out;
+  }
+  .btn:hover:not(:disabled),.round-button:hover:not(:disabled){
+    border-color:#363e36;
+  }
+  .nav button:hover:not(:disabled){transform:translateX(2px)}
+}
+@media(prefers-reduced-motion:reduce){
+  .btn,.round-button,.nav button,.task-check {transition:none!important}
+}

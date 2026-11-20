@@ -34,3 +34,19 @@ test("MONO style loads after structural CSS and covers core workspace surfaces",
  assert.match(mono,/@media\s*\(max-width:\s*560px\)/);
  assert.match(mono,/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
 });
+
+test("task and checklist toggles paint immediately before network writes",()=>{
+ const paint=app.indexOf('function paintCompletion(kind,id,previousStatus,nextStatus)');
+ assert.ok(paint>0,"Immediate completion painter exists");
+ const task=app.slice(app.indexOf(' const toggle=ev.target.closest("[data-toggle]");'));
+ assert.ok(task.indexOf('paintCompletion("task",task.id,previous,status);')>=0);
+ assert.ok(task.indexOf('paintCompletion("task",task.id,previous,status);')<
+   task.indexOf('await setLiveTaskStatus(team,task.id,status)'),"Task checkmark appears before round trip");
+ assert.ok(task.indexOf('statusWritesInFlight.has(key)')>=0,"Repeated task clicks are guarded");
+ assert.ok(task.indexOf('paintCompletion("task",task.id,status,previous);')>=0,"Failed task writes revert the UI");
+ const checklist=app.slice(app.indexOf(' const checklistToggle=ev.target.closest("[data-checklist-toggle]");'));
+ assert.ok(checklist.indexOf('paintCompletion("checklist",item.id,previous,status);')>=0);
+ assert.ok(checklist.indexOf('paintCompletion("checklist",item.id,previous,status);')<
+   checklist.indexOf('await setChecklistStatus(team,item.id,status)'),"Checklist changes before the network");
+ assert.ok(checklist.indexOf('paintCompletion("checklist",item.id,status,previous);')>=0);
+});
