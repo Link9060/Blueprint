@@ -279,7 +279,7 @@ function renderPeople(){
   return '<article class="card directory-request"><div><b>'+e(person?.name||"Member")+'</b><small>Requests '+e(roleLabels[r.requested_role]||r.requested_role)+'</small><p>'+e(r.reason||"No reason supplied")+'</p></div>'+
    (allowed?'<div class="request-actions"><button class="btn small" data-role-request-decision="'+e(r.id)+'" data-decision-role="declined">Decline</button><button class="btn primary small" data-role-request-decision="'+e(r.id)+'" data-decision-role="approved">Approve</button></div>':'<small class="hint">Higher-ranking approval required</small>')+'</article>';
  }).join(""):"";
- return heading("PEOPLE & ROLES","Team directory","Find your team and manage roles with rank-limited permissions.",state.mode==="live"?button("Request higher role","request-role"):"")+
+ return heading("PEOPLE & ROLES","Team directory","Find your team and manage roles with rank-limited permissions.",state.mode==="live"&&(roleTiers[actualRole()]||0)<4?button("Request higher role","request-role"):"")+
   sampleNote()+'<div class="people">'+(cards||'<div class="empty">No members to show.</div>')+'</div>'+
   (ownRequests.length?'<p class="hint">Your role requests: '+ownRequests.slice(0,3).map(r=>e(roleLabels[r.requested_role])+' ('+e(r.status)+')').join(" · ")+'</p>':"")+
   (canEdit()&&pending.length?'<section class="directory-requests"><h2>Requests for higher roles</h2>'+queue+'</section>':"");
@@ -498,6 +498,15 @@ function modal(){
    '<input id="event-time" type="datetime-local" name="start" class="field" required value="'+e(localDateTime(record?.starts_at))+'"></div>'+
    '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">'+(editing?"Save changes":"Schedule event")+'</button></div></form>';
 
+ }else if(state.modal==="role-request"){
+  const choices=["lead","captain","mentor","admin"].filter(role=>(roleTiers[role]||0)>(roleTiers[actualRole()]||0));
+  if(!choices.length)return "";
+  title="Request a higher role";
+  description="A team leader will review your request. Your current permissions stay unchanged.";
+  body='<form id="role-request-form"><div class="form-group"><label for="requested-role">Requested role</label><select id="requested-role" name="requested_role" class="field" required>'+
+   choices.map(r=>'<option value="'+r+'">'+e(roleLabels[r])+'</option>').join("")+'</select></div>'+
+   '<div class="form-group"><label for="request-reason">Why do you need this access?</label><textarea id="request-reason" name="reason" class="field" maxlength="500" rows="4" placeholder="Describe which team responsibilities you need to manage"></textarea></div>'+
+   '<div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Send request</button></div></form>';
  }else if(state.modal==="announcement"){
   title="Publish an announcement";description="This update will be visible to every approved member of this team.";
   body='<form id="announcement-form"><div class="form-group"><label for="announce-title">Title</label><input id="announce-title" name="title" class="field" maxlength="140" required placeholder="Short, clear headline"></div><div class="form-group"><label for="announce-body">Message</label><textarea id="announce-body" name="body" class="field" maxlength="2000" required placeholder="What does everyone need to know?"></textarea></div><div class="form-buttons"><button type="button" class="btn" data-action="close-modal">Cancel</button><button type="submit" class="btn primary">Publish announcement</button></div></form>';
