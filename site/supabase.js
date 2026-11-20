@@ -44,7 +44,7 @@ export async function updateMemberRole(team,userId,role){
  const rows=unwrap(await sb.from("team_memberships").update({role}).eq("team_id",team).eq("user_id",userId).eq("status","approved").select("user_id"));
  if(!rows?.length)throw new Error("Role could not be changed; check administrator access.");
 }
-export async function requestMembership(team,user,fullName,subgroup){
+export async function requestMembership(team,user,fullName,subgroup,allowPending=true){
  if(!teams.find(x=>x.id===team))throw new Error("Unknown team.");
  const sb=await client();
  const profile=await sb.from("profiles").insert({id:user.id,full_name:fullName});
@@ -65,6 +65,7 @@ export async function requestMembership(team,user,fullName,subgroup){
   if(!["42501","PGRST116"].includes(joined.error.code) &&
      !/row.level.security|permission denied/i.test(joined.error.message||""))throw joined.error;
  }
+ if(!allowPending)return null;
  unwrap(await sb.from("team_memberships").insert({team_id:team,user_id:user.id,role:"member",subgroup,status:"pending"}));
  return "pending";
 }
