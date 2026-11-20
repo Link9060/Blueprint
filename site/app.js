@@ -782,6 +782,51 @@ app.addEventListener("click",async ev=>{
  }
  const project=ev.target.closest("[data-edit-project]");
  if(project&&canEdit()){state.editingProjectId=project.dataset.editProject;state.modal="project-edit";render();return;}
+ const removeAnnouncement=ev.target.closest("[data-remove-announcement]");
+ if(removeAnnouncement){
+  if(previewReadOnly()||!canEdit())return;
+  const id=removeAnnouncement.dataset.removeAnnouncement;
+  if(!window.confirm("Remove this announcement for everyone? This cannot be undone."))return;
+  try{
+   if(state.mode==="demo"){
+    state.data.announcements=state.data.announcements.filter(x=>String(x.id)!==id);
+    save(state.team,state.data);render();
+   }else{await removeLiveAnnouncement(state.team,id);await refresh(true);}
+   toast("Announcement removed.");
+  }catch(err){toast("Could not remove announcement: "+(err.message||"Access denied"));}
+  return;
+ }
+ const removeLog=ev.target.closest("[data-remove-log]");
+ if(removeLog){
+  if(previewReadOnly()||!canEdit())return;
+  const id=removeLog.dataset.removeLog;
+  if(!window.confirm("Permanently remove this build log entry? An audit record will remain."))return;
+  try{
+   if(state.mode==="demo"){
+    state.data.logs=state.data.logs.filter(x=>String(x.id)!==id);
+    save(state.team,state.data);render();
+   }else{await removeLiveLog(state.team,id);await refresh(true);}
+   toast("Build log removed.");
+  }catch(err){toast("Could not remove log: "+(err.message||"Access denied"));}
+  return;
+ }
+ const roleDecision=ev.target.closest("[data-role-request-decision]");
+ if(roleDecision){
+  if(previewReadOnly()||!canEdit()||state.mode!=="live")return;
+  const id=roleDecision.dataset.roleRequestDecision,status=roleDecision.dataset.decisionRole;
+  const request=(state.data.roleRequests||[]).find(r=>String(r.id)===id&&r.status==="pending");
+  const target=state.data.people.find(p=>p.id===request?.requester_id);
+  if(!request||!target||!["approved","declined"].includes(status))return;
+  if(!roleOptionsForManager(effectiveRole(),target.role,false).includes(request.requested_role))return toast("A higher-ranking manager must review this request.");
+  if(!window.confirm(status==="approved"?"Approve "+target.name+" for "+roleLabels[request.requested_role]+"?":"Decline this role request?"))return;
+  try{
+   if(status==="approved")await updateMemberRole(state.team,request.requester_id,request.requested_role);
+   await decideHigherRole(state.team,id,status);
+   await refresh(true);
+   toast(status==="approved"?"Role updated and request approved.":"Request declined.");
+  }catch(err){toast("Could not review role request: "+(err.message||"Access denied"));await refresh(true);}
+  return;
+ }
  const decision=ev.target.closest("[data-decision]");
  if(decision){
   if(previewReadOnly())return toast("Exit role preview before approving members.");
