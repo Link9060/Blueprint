@@ -326,24 +326,30 @@ function renderAdmin(){
 }
 
 function renderMessages(){
- const messages=(state.data.messages[state.channel]||[]).filter(m=>!m.hidden||canEdit()).map(m=>{
+ const list=(state.data.messages[state.channel]||[]).filter(m=>!m.hidden||canEdit());
+ const messages=list.map(m=>{
   const moderator=canEdit();
-  return '<div class="message '+(m.hidden?"message-muted":"")+'"><div class="avatar">'+e(m.initials||initials(m.author))+'</div>'+
-   '<div class="message-content"><div class="message-header"><b>'+e(m.author)+'</b><small>'+e(m.time)+'</small></div>'+
-   (m.hidden?'<small class="moderation-label">Hidden by a team moderator · visible to administrators</small>':"")+
+  const mine=state.mode==="demo"?m.author==="You (preview)":m.author_id===state.user?.id;
+  return '<div class="message '+(mine?"message-own ":"")+(m.hidden?"message-muted":"")+'" data-dom-key="message-'+e(m.id)+'">'+
+   '<div class="avatar">'+e(m.initials||initials(m.author))+'</div>'+
+   '<div class="message-content"><div class="message-header"><b>'+e(m.author)+(mine?" · You":"")+'</b><small>'+e(m.time)+'</small></div>'+
+   (m.hidden?'<small class="moderation-label">Hidden · visible to team moderators only</small>':"")+
    '<p>'+e(m.text)+'</p><div class="message-actions">'+
    (!m.hidden?'<button type="button" class="subtle-action" data-report-message="'+e(m.id)+'">Report</button>':"")+
    (moderator?'<button type="button" class="subtle-action" data-message-visibility="'+e(m.id)+'" data-visible="'+(m.hidden?"yes":"no")+'">'+(m.hidden?"Restore":"Hide")+'</button>':"")+
    '</div></div></div>';
  }).join("");
- return heading("CONVERSATIONS","Team messages","Subgroup channels with a private, administrator-reviewed report option.")+
+ return heading("CONVERSATIONS","Team messages","Communicate by subgroup. Leads and above can moderate reported messages.")+
   sampleNote()+'<div class="card chat"><aside class="channels"><h3>CHANNELS</h3>'+
   channels.map(c=>'<button class="channel '+(state.channel===c?"active":"")+'" data-channel="'+c+'"># '+e(c)+'</button>').join("")+
-  '</aside><section class="conversation"><div class="chat-head"><b># '+e(state.channel)+'</b><small>Team '+e(state.team)+
-  ' · '+(state.mode==="demo"?"Local preview":"Team channel")+'</small></div><div class="messages">'+
-  (messages||'<div class="empty">Start the conversation.</div>')+'</div>'+
-  '<form class="compose" id="compose-form" data-form-context="'+e(state.channel)+'"><input class="field" name="body" maxlength="1000" placeholder="Message #'+e(state.channel)+
-  '" aria-label="Message" required><button class="btn primary" type="submit">Send '+icon("arrow",14)+'</button></form></section></div>';
+  '</aside><section class="conversation"><div class="chat-head"><div><b># '+e(state.channel)+'</b><small>Team '+e(state.team)+' · '+(state.mode==="demo"?"Sample workspace":"Team channel")+'</small></div>'+
+  '<span class="chat-indicator">'+(state.mode==="live"?"● LIVE":"◌ DEMO")+'</span></div>'+
+  '<div class="messages" role="log" aria-label="Messages in '+e(state.channel)+'" aria-live="polite">'+
+  (messages||'<div class="empty chat-empty">No messages here yet. Start the conversation.</div>')+'</div>'+
+  '<form class="compose" id="compose-form" data-form-context="'+e(state.channel)+'">'+
+  '<label class="sr-only" for="compose-message">Message</label><textarea id="compose-message" class="field" name="body" maxlength="1000" rows="2" placeholder="Message #'+e(state.channel)+'" required></textarea>'+
+  '<button class="btn primary" type="submit">Send '+icon("arrow",14)+'</button></form>'+
+  '<div class="chat-compose-hint">ENTER TO SEND · SHIFT + ENTER FOR NEW LINE</div></section></div>';
 }
 function renderManufacturing(){
  const requests=state.data.partRequests||[];
