@@ -179,9 +179,10 @@ create trigger blueprint_role_request_guard before insert or update on public.ro
 -- the school email domains for each robotics team.
 create table if not exists private.blueprint_google_domains (
  team_id text not null references public.teams(id) on delete cascade,
- domain text not null check(domain=lower(domain) and domain ~ '^[a-z0-9.-]+\\.[a-z]{2,}$'),
+ domain text not null check(domain=lower(domain) and domain ~ '^[a-z0-9.-]+[.][a-z]{2,}$'),
  primary key(team_id,domain)
 );
+alter table private.blueprint_google_domains enable row level security;
 revoke all on private.blueprint_google_domains from public,anon,authenticated;
 create or replace function private.blueprint_google_join_allowed(p_team text)
 returns boolean language sql stable security definer set search_path=''
