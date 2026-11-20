@@ -183,7 +183,7 @@ function renderTasks(){
 function renderLogs(){
  const entries=state.data.logs.map(l=>
   '<article class="log"><div class="record-title"><h3>'+e(l.title)+'</h3>'+
-  (canEdit()?'<button type="button" class="btn small record-edit" data-edit-log="'+e(l.id)+'">'+icon("pencil",13)+' Edit</button>':"")+
+  (canEdit()?'<div class="record-controls"><button type="button" class="btn small record-edit" data-edit-log="'+e(l.id)+'">'+icon("pencil",13)+' Edit</button><button type="button" class="btn small" data-remove-log="'+e(l.id)+'">Remove</button></div>':"")+
   '</div><p>'+e(l.body)+'</p><small>'+e(l.subgroup)+' · '+e(l.author)+' · '+e(l.time)+
   (l.edited_at?' · Edited by '+e(l.edited_by||"Team lead"):"")+'</small></article>'
  ).join("");
@@ -308,8 +308,12 @@ function renderCalendar(){
 }
 
 function renderAnnouncements(){
- const cards=(state.data.announcements||[]).map(x=>'<article class="card pad" style="margin-bottom:12px"><div class="eyebrow">'+e(x.author)+' · '+e(x.time)+'</div><h3 style="font-size:15px;letter-spacing:-.3px;margin:12px 0 6px">'+e(x.title)+'</h3><p style="font-size:12px;line-height:1.8;color:#75838a;white-space:pre-wrap;margin:0">'+e(x.body)+'</p></article>').join("");
- return heading("TEAM UPDATES","Announcements","Important information, without getting lost in a conversation.",canEdit()?button(icon("plus",15)+" Publish update","new-announcement","primary"):"")+sampleNote()+(cards||'<div class="empty">Nothing posted yet. Team leads can publish the first update.</div>');
+ const cards=(state.data.announcements||[]).map(x=>
+  '<article class="card pad announcement-card" data-dom-key="announcement-'+e(x.id)+'"><div class="record-title"><div class="eyebrow">'+e(x.author)+' · '+e(x.time)+'</div>'+
+  (canEdit()&&!previewReadOnly()?'<button type="button" class="btn small" data-remove-announcement="'+e(x.id)+'">Remove</button>':"")+'</div>'+
+  '<h3>'+e(x.title)+'</h3><p>'+e(x.body)+'</p></article>').join("");
+ return heading("TEAM UPDATES","Announcements","Important information, without getting lost in a conversation.",canEdit()?button(icon("plus",15)+" Publish update","new-announcement","primary"):"")+sampleNote()+
+  (cards||'<div class="empty">Nothing posted yet. Team leads can publish the first update.</div>');
 }
 
 function canAdmin(){return canManageTeam(effectiveRole());}
