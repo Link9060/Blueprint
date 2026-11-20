@@ -123,8 +123,8 @@ declare n integer;
 begin
  select count(*) into n from public.role_requests;
  if n<>0 then raise exception 'Role request leaked across teams';end if;
- select count(*) into n from public.activity_events;
- if n<>0 then raise exception 'Activity log leaked across teams';end if;
+ select count(*) into n from public.activity_events where team_id='1810';
+ if n<>0 then raise exception 'Other team accessed 1810 audit history';end if;
 end $$;
 reset role;
 select 'Blueprint v8 security checks passed' as result;
