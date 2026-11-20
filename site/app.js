@@ -1,12 +1,12 @@
 import {teams,groups,channels,workspace,save,reset,progress} from "./data.js";
-import {roleLabels,rolePreviewOptions,canManageTeam,canManageWork,roleIsPreviewable} from "./roles.js";
+import {roleLabels,rolePreviewOptions,canManageTeam,canManageWork,roleIsPreviewable,roleTiers,roleOptionsForManager} from "./roles.js";
 import {avatarColors,avatarColorNames,avatarClass,localDateTime} from "./profile.js";
 import {safeReferenceUrl,reportReasons,fabricationMethods,fabricationStatuses,fabricationLabels,fabricationStatusLabels,engineeringKinds} from "./engineering.js";
 import {inventoryUnits,milestoneStatuses,milestoneLabels,stockCoverage,milestonesFor,milestoneProgress,validQuantity} from "./planning.js";
 import {preparationCategories,preparationLabels,taskPrerequisites,taskBlockers,wouldCreateCycle,eventPreparation,preparationProgress} from "./coordination.js";
 import {patchHtml} from "./dom-patch.js";
 import {installMotion,celebrateTask} from "./motion.js";
-import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,editLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,editLiveEvent,addLiveAnnouncement,getLiveProfile,saveLiveProfile,updateOwnSubgroup,subscribeTeam,reportTeamMessage,reviewTeamReport,setMessageVisibility,createEngineeringLink,deleteEngineeringLink,requestPart,setPartStatus,createInventoryItem,updateInventoryItem,createBomLine,updateBomLine,removeBomLine,createProjectMilestone,updateProjectMilestone,removeProjectMilestone,addTaskDependency,removeTaskDependency,addEventChecklistItem,editEventChecklistItem,setChecklistStatus,deleteEventChecklistItem} from "./supabase.js";
+import {configured,getUser,googleSignIn,signOut,membership,requestMembership,liveWorkspace,addLiveTask,editLiveTask,setLiveTaskStatus,addLiveLog,editLiveLog,sendLiveMessage,approveMembership,updateMemberRole,sendMagicLink,addLiveProject,editLiveProject,addLiveEvent,editLiveEvent,addLiveAnnouncement,removeLiveAnnouncement,removeLiveLog,requestHigherRole,decideHigherRole,getLiveProfile,saveLiveProfile,updateOwnSubgroup,subscribeTeam,reportTeamMessage,reviewTeamReport,setMessageVisibility,createEngineeringLink,deleteEngineeringLink,requestPart,setPartStatus,createInventoryItem,updateInventoryItem,createBomLine,updateBomLine,removeBomLine,createProjectMilestone,updateProjectMilestone,removeProjectMilestone,addTaskDependency,removeTaskDependency,addEventChecklistItem,editEventChecklistItem,setChecklistStatus,deleteEventChecklistItem} from "./supabase.js";
 
 const app=document.getElementById("app");
 const state={team:sessionStorage.getItem("blueprint-selected-team")||null,view:"overview",filter:"all",channel:"general",modal:null,menu:false,editingTaskId:null,editingProjectId:null,editingLogId:null,editingEventId:null,editingStockId:null,editingBomId:null,editingMilestoneId:null,planningProjectId:null,dependencyTaskId:null,checklistEventId:null,editingChecklistId:null,reportMessageId:null,linkProjectId:null,profile:null,authNotice:"",unsubscribe:null,subscriptionTeam:null,refreshBusy:false,realtimeTimer:null,taskScope:"all",rolePreview:null,mode:configured()?"live":"demo",user:null,member:null,data:null,loading:false,error:""};
@@ -305,8 +305,8 @@ function renderAdmin(){
 }
 
 function renderMessages(){
- const messages=(state.data.messages[state.channel]||[]).filter(m=>!m.hidden||canAdmin()).map(m=>{
-  const moderator=canAdmin();
+ const messages=(state.data.messages[state.channel]||[]).filter(m=>!m.hidden||canEdit()).map(m=>{
+  const moderator=canEdit();
   return '<div class="message '+(m.hidden?"message-muted":"")+'"><div class="avatar">'+e(m.initials||initials(m.author))+'</div>'+
    '<div class="message-content"><div class="message-header"><b>'+e(m.author)+'</b><small>'+e(m.time)+'</small></div>'+
    (m.hidden?'<small class="moderation-label">Hidden by a team moderator · visible to administrators</small>':"")+
@@ -338,7 +338,7 @@ function renderManufacturing(){
   sampleNote()+'<div class="manufacture-board">'+(cards||'<div class="empty">No manufacturing requests yet.</div>')+'</div>';
 }
 function renderSafety(){
- if(!canAdmin())return heading("TEAM SAFETY","Restricted","Only team administrators can review reports and activity history.");
+ if(!canEdit())return heading("TEAM SAFETY","Restricted","Only team Leads and above can review reports and activity history.");
  const reports=state.data.reports||[];
  const open=reports.filter(r=>r.status==="open");
  const resolved=reports.filter(r=>r.status!=="open");
@@ -358,7 +358,7 @@ function renderSafety(){
   '<small>'+e(new Date(x.created_at).toLocaleString())+'</small></div>'
  ).join("");
  return heading("TEAM SAFETY","Moderation & activity","Review reports, hide harmful messages in team channels and inspect an append-only history.")+
-  sampleNote()+notice('Reports are private. Only team administrators can review them. Messages are hidden rather than deleted so records remain available for review.')+
+  sampleNote()+notice('Reports are private. Only team Leads and above can review them. Messages are hidden rather than deleted so records remain available for review.')+
   section("Needs review",'<span class="pill">'+open.length+' open</span>',
    open.map(reportCard).join("")||'<div class="empty">No outstanding reports.</div>')+
   '<div class="dashboard-spacer"></div>'+
@@ -397,7 +397,7 @@ function renderSettings(){
 function canEdit(){return canManageWork(effectiveRole());}
 function sidebar(){
  const navigation=a("overview","Overview","overview")+a("announcements","Announcements","bell")+a("tasks","Tasks","tasks")+a("logs","Build log","logs")+a("projects","Robot projects","projects")+a("manufacturing","Manufacturing","projects")+a("inventory","Inventory","projects")+a("messages","Messages","messages")+a("calendar","Calendar","calendar")+a("people","Members","people");
- return '<div class="screen '+(state.menu?"show":"")+'" data-action="close-menu"></div><aside class="side '+(state.menu?"open":"")+'"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><button class="team-picker" data-action="switch-team"><span class="team-box">'+e(state.team)+'</span><span><b>'+e(currentTeam().name)+'</b><small>Team workspace</small></span><span class="chev">'+icon("chevron",14)+'</span></button>'+previewSelector("sidebar")+'<div class="side-caption">WORKSPACE</div><nav class="nav" aria-label="Workspace">'+navigation+'</nav><div class="side-caption">GENERAL</div><nav class="nav" aria-label="General">'+(canAdmin()?a("admin","Membership","people")+a("safety","Moderation","info"):"")+a("profile","My profile","people")+a("settings","Settings","settings")+'</nav><div class="side-bottom">'+avatarHtml(currentProfile().full_name||state.user?.user_metadata?.full_name||"Preview User",currentProfile().avatar_color)+'<div><b>'+(state.mode==="demo"?"Preview user":e(currentProfile().full_name||state.user?.user_metadata?.full_name||"Team member"))+'</b><small>'+(state.mode==="demo"?"Demo workspace":e(roleLabels[actualRole()]||"Member"))+'</small></div><button class="push" data-action="sign-out" aria-label="Leave workspace">'+icon("logout",17)+'</button></div></aside>';
+ return '<div class="screen '+(state.menu?"show":"")+'" data-action="close-menu"></div><aside class="side '+(state.menu?"open":"")+'"><div class="wordmark"><span class="logo">b.</span>blueprint<span class="period">.</span></div><button class="team-picker" data-action="switch-team"><span class="team-box">'+e(state.team)+'</span><span><b>'+e(currentTeam().name)+'</b><small>Team workspace</small></span><span class="chev">'+icon("chevron",14)+'</span></button>'+previewSelector("sidebar")+'<div class="side-caption">WORKSPACE</div><nav class="nav" aria-label="Workspace">'+navigation+'</nav><div class="side-caption">GENERAL</div><nav class="nav" aria-label="General">'+(canAdmin()?a("admin","Membership","people"):"")+(canEdit()?a("safety","Moderation","info"):"")+a("profile","My profile","people")+a("settings","Settings","settings")+'</nav><div class="side-bottom">'+avatarHtml(currentProfile().full_name||state.user?.user_metadata?.full_name||"Preview User",currentProfile().avatar_color)+'<div><b>'+(state.mode==="demo"?"Preview user":e(currentProfile().full_name||state.user?.user_metadata?.full_name||"Team member"))+'</b><small>'+(state.mode==="demo"?"Demo workspace":e(roleLabels[actualRole()]||"Member"))+'</small></div><button class="push" data-action="sign-out" aria-label="Leave workspace">'+icon("logout",17)+'</button></div></aside>';
 }
 function shell(){
  const views={overview:renderOverview,announcements:renderAnnouncements,tasks:renderTasks,logs:renderLogs,projects:renderProjects,messages:renderMessages,calendar:renderCalendar,people:renderPeople,admin:renderAdmin,safety:renderSafety,manufacturing:renderManufacturing,inventory:renderInventory,profile:renderProfile,settings:renderSettings};
@@ -726,6 +726,7 @@ async function dispatchAction(action){
  if(action==="new-project"){if(!canEdit())return;state.editingProjectId=null;state.modal="project";render();return;}
  if(action==="new-event"){if(!canEdit())return;state.editingEventId=null;state.modal="event";render();return;}
  if(action==="new-announcement"){if(!canEdit())return;state.modal="announcement";render();return;}
+ if(action==="request-role"){if(state.mode!=="live"||!state.member||state.member.status!=="approved")return;state.modal="role-request";render();return;}
  if(action==="new-part"){state.modal="part";render();return;}
  if(action==="new-stock"){if(!canEdit())return;state.editingStockId=null;state.modal="stock";render();return;}
  if(action==="open-profile"){state.view="profile";state.menu=false;state.modal=null;render();return;}
@@ -903,7 +904,7 @@ app.addEventListener("click",async ev=>{
  }
  const moderate=ev.target.closest("[data-message-visibility]");
  if(moderate){
-  if(previewReadOnly()||!canAdmin())return;
+  if(previewReadOnly()||!canEdit())return;
   const id=moderate.dataset.messageVisibility,visible=moderate.dataset.visible==="yes";
   try{
    if(state.mode==="demo"){
@@ -919,7 +920,7 @@ app.addEventListener("click",async ev=>{
  }
  const review=ev.target.closest("[data-review-report]");
  if(review){
-  if(previewReadOnly()||!canAdmin())return;
+  if(previewReadOnly()||!canEdit())return;
   const id=review.dataset.reviewReport,status=review.dataset.reportStatus;
   if(!["reviewed","dismissed"].includes(status))return;
   try{
