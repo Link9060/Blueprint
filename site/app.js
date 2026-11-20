@@ -58,6 +58,38 @@ function previewSelector(slot="sidebar"){
 function previewBanner(){
  return previewReadOnly()?'<div class="role-preview-banner" role="status"><div><b>Viewing as '+roleLabels[effectiveRole()]+'</b><span>Visual preview only. Your real access stays '+roleLabels[actualRole()]+'. All edits are disabled. Test accounts are needed to verify database permissions.</span></div><button type="button" class="btn small" data-action="end-role-preview">Exit preview</button></div>':"";
 }
+
+// Task and event checkboxes acknowledge interaction *before* network latency.
+// A small DOM update avoids a full workspace rerender on the pointer's critical path.
+const statusWritesInFlight=new Set();
+function paintCompletion(kind,id,previousStatus,nextStatus){
+ const attr=kind==="task"?"data-toggle":"data-checklist-toggle";
+ const selector="["+attr+"]";
+ for(const box of app.querySelectorAll(selector)){
+  if(box.getAttribute(attr)!==String(id))continue;
+  const completed=nextStatus==="done";
+  box.classList.toggle("done",completed);
+  box.setAttribute("aria-pressed",String(completed));
+  box.setAttribute("aria-busy","true");
+  const row=box.closest(".task,.entry,.event-checklist-item");
+  if(!row)continue;
+  const title=row.querySelector(".task-body > b,.entry-main > b,.event-checklist-item > div > b");
+  title?.classList.toggle("strike",completed);
+  const label=row.querySelector(".pill");
+  if(label&&kind==="task"){
+   label.classList.toggle("complete",completed);
+   label.classList.toggle("active",nextStatus==="in_progress");
+   label.classList.toggle("blocked",nextStatus==="blocked");
+   label.textContent=statusName(nextStatus);
+  }
+ }
+}
+function clearCompletionPending(kind,id){
+ const attr=kind==="task"?"data-toggle":"data-checklist-toggle";
+ for(const box of app.querySelectorAll("["+attr+"]")){
+  if(box.getAttribute(attr)===String(id))box.removeAttribute("aria-busy");
+ }
+}
 function canToggle(t){
  const authorized=!previewReadOnly()&&(canEdit()||(state.mode==="demo"?Boolean(t.assigned_to):Boolean(t.assigned_to&&t.assigned_to===state.user?.id)));
  return authorized&&(t.status==="done"||taskBlockers(t.id,state.data.taskDependencies||[],state.data.tasks).length===0);
@@ -818,13 +850,29 @@ app.addEventListener("click",async ev=>{
   const item=state.data.eventChecklist.find(x=>String(x.id)===checklistToggle.dataset.checklistToggle);
   if(!item)return;
   if(!canToggleChecklist(item))return toast("Only the assigned teammate or a Lead may check off this item.");
-  const status=item.status==="done"?"todo":"done";
+  const key="checklist:"+state.team+":"+item.id;
+  if(statusWritesInFlight.has(key))return;
+  const previous=item.status,status=previous==="done"?"todo":"done",team=state.team;
+  statusWritesInFlight.add(key);
+  item.status=status;
+  paintCompletion("checklist",item.id,previous,status);
+  if(status==="done")celebrateTask(app,item.id,true);
   try{
-   if(state.mode==="demo"){item.status=status;save(state.team,state.data);render();}
-   else{await setChecklistStatus(state.team,item.id,status);await refresh(true);}
-   if(status==="done")celebrateTask(app,item.id,true);
+   if(state.mode==="demo"){save(team,state.data);render();}
+   else{await setChecklistStatus(team,item.id,status);if(state.team===team)await refresh(true);}
    toast(status==="done"?"Checklist item completed.":"Checklist item reopened.");
-  }catch(err){toast("Checklist update rejected: "+(err.message||"Unknown error"));}
+  }catch(err){
+   if(state.team===team){
+    const current=state.data?.eventChecklist?.find(x=>String(x.id)===String(item.id));
+    if(current)current.status=previous;
+    paintCompletion("checklist",item.id,status,previous);
+    render();
+   }
+   toast("Checklist update rejected: "+(err.message||"Unknown error"));
+  }finally{
+   statusWritesInFlight.delete(key);
+   clearCompletionPending("checklist",item.id);
+  }
   return;
  }
  const reportButton=ev.target.closest("[data-report-message]");
@@ -887,17 +935,31 @@ app.addEventListener("click",async ev=>{
  }
  const toggle=ev.target.closest("[data-toggle]");
  if(toggle){
-  const task=state.data?.tasks.find(t=>String(t.id)===toggle.dataset.toggle);if(!task)return;if(!canToggle(task))return toast("Only an assigned member or lead can change this task.");
-  const status=task.status==="done"?"todo":"done";
-  if(state.mode==="demo"){
-   task.status=status;save(state.team,state.data);render();
-   if(status==="done")celebrateTask(app,task.id);
-  }else{
-   try{
-    await setLiveTaskStatus(state.team,task.id,status);
-    await refresh(true);
-    if(status==="done")celebrateTask(app,task.id);
-   }catch(err){toast("Update rejected: "+err.message);}
+  const task=state.data?.tasks.find(t=>String(t.id)===toggle.dataset.toggle);
+  if(!task)return;
+  if(!canToggle(task))return toast("Only an assigned member or lead can change this task.");
+  const key="task:"+state.team+":"+task.id;
+  if(statusWritesInFlight.has(key))return;
+  const previous=task.status,status=previous==="done"?"todo":"done",team=state.team;
+  statusWritesInFlight.add(key);
+  // Show the checkmark and title state now. Network writes happen afterward.
+  task.status=status;
+  paintCompletion("task",task.id,previous,status);
+  if(status==="done")celebrateTask(app,task.id);
+  try{
+   if(state.mode==="demo"){save(team,state.data);render();}
+   else{await setLiveTaskStatus(team,task.id,status);if(state.team===team)await refresh(true);}
+  }catch(err){
+   if(state.team===team){
+    const current=state.data?.tasks?.find(t=>String(t.id)===String(task.id));
+    if(current)current.status=previous;
+    paintCompletion("task",task.id,status,previous);
+    render();
+   }
+   toast("Update rejected: "+(err.message||"Unknown error"));
+  }finally{
+   statusWritesInFlight.delete(key);
+   clearCompletionPending("task",task.id);
   }
   return;
  }
