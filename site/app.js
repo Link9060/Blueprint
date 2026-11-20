@@ -695,6 +695,18 @@ async function refresh(quiet=false){
   if(state.team!==requestedTeam)return;
   state.user=user;
   state.member=user?await membership(requestedTeam,user.id):null;
+  // School-domain-verified Google users can be added as basic Members by RLS.
+  // Non-allowlisted Google accounts remain on the team join screen.
+  if(user&&!state.member&&state.mode==="live"&&user.email_confirmed_at&&
+      (user.app_metadata?.provider==="google"||user.app_metadata?.providers?.includes("google"))){
+   try{
+    const suggested=String(user.user_metadata?.full_name||user.email?.split("@")[0]||"Team member").trim().slice(0,80);
+    await requestMembership(requestedTeam,user,suggested||"Team member","Design",false);
+    state.member=await membership(requestedTeam,user.id);
+   }catch(err){
+    state.error=err.message||"Automatic team entry unavailable.";
+   }
+  }
   state.profile=user?await getLiveProfile(user.id):null;
   if(state.mode==="live"&&state.member?.role!=="owner")state.rolePreview=null;
   state.data=state.member?.status==="approved"?await liveWorkspace(requestedTeam):null;
